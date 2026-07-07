@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <title>PL Record Book — DW2 Pro League</title>
+  <meta name="description" content="DW2 Pro League Record Book — Rankings, player stats, match history and tournament records.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ── Header ─────────────────────────────────── -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo" onclick="navigate('home')">
+          <span class="logo-icon">🏆</span>
+          <span class="logo-text">PL<span class="logo-accent">RECORD</span>BOOK</span>
+        </div>
+        <nav class="nav">
+          <button class="nav-btn active" data-page="home" onclick="navigate('home')">Home</button>
+          <button class="nav-btn" data-page="rankings" onclick="navigate('rankings')">Rankings</button>
+          <button class="nav-btn" data-page="players" onclick="navigate('players')">Players</button>
+          <button class="nav-btn" data-page="events" onclick="navigate('events')">Events</button>
+          <button class="nav-btn" data-page="stats" onclick="navigate('stats')">Stats</button>
+        </nav>
+        <div class="header-right">
+          <div class="region-selector" id="regionSelector">
+            <button class="region-btn active" data-region="Global" onclick="setRegion('Global')">🌍 Global</button>
+            <button class="region-btn" data-region="EU" onclick="setRegion('EU')">🇪🇺 EU</button>
+            <button class="region-btn" data-region="NA" onclick="setRegion('NA')">🇺🇸 NA</button>
+            <button class="region-btn" data-region="SA" onclick="setRegion('SA')">🌎 SA</button>
+            <button class="region-btn" data-region="AS" onclick="setRegion('AS')">🇰🇷 AS</button>
+          </div>
+          <button class="admin-btn" id="adminBtn" onclick="toggleAdmin()">⚙️ Admin</button>
+          <div class="admin-menu hidden" id="adminMenu">
+            <div id="adminLogin">
+              <input type="email" id="adminEmail" placeholder="Email" class="admin-input">
+              <input type="password" id="adminPass" placeholder="Password" class="admin-input">
+              <button class="admin-login-btn" onclick="adminLogin()">Login</button>
+            </div>
+            <div id="adminPanel" class="hidden">
+              <button class="admin-action" onclick="navigate('admin-players')">Manage Players</button>
+              <button class="admin-action" onclick="navigate('admin-matches')">Add Match</button>
+              <button class="admin-action" onclick="navigate('admin-events')">Manage Events</button>
+              <button class="admin-action" onclick="exportPDF()">📄 Export PDF</button>
+              <button class="admin-action" onclick="exportSheets()">📊 Export Sheets</button>
+              <button class="admin-logout" onclick="adminLogout()">Logout</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Main Content ─────────────────────────── -->
+    <main class="main" id="mainContent">
+      <!-- Content rendered by JS -->
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Loading PL Record Book...</p>
+      </div>
+    </main>
+
+    <!-- ── Footer ───────────────────────────────── -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <p>PL Record Book — Drunken Wrestlers 2 Pro League</p>
+        <p class="footer-sub">Data source: Firestore · Built with ❤️ by ProtagoNix</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, getDocs, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    
+    // ── Config ──────────────────────────────────────
+    const firebaseConfig = window.FIREBASE_CONFIG || {
+      // Will be filled with actual config
+      apiKey: "AIzaSyXXXXXXXXXXXXXXXX",
+      authDomain: "pl-dashboard-XXXXX.firebaseapp.com",
+      projectId: "pl-dashboard-XXXXX",
+      storageBucket: "pl-dashboard-XXXXX.appspot.com",
+      messagingSenderId: "XXXXXXXXXXXXX",
+      appId: "1:XXXXXXXXXXXXX:web:XXXXXXXXXXXXX"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    
+    // ── State ───────────────────────────────────────
+    let state = {
+      page: 'home',
+      region: 'Global',
+      players: [],
+      matches: [],
+      events: [],
+      rankings: [],
+      currentUser: null,
+      isAdmin: false,
+      searchQuery: ''
+    };
+    
+    // ── Data Loading ────────────────────────────────
+    async function loadData() {
+      try {
+        const [playersSnap, matchesSnap, eventsSnap] = await Promise.all([
+          getDocs(collection(db, 'players')),
+          getDocs(collection(db, 'matches')),
+          getDocs(collection(db, 'events'))
+        ]);
+        
+        state.players = playersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.events = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        console.log(`Loaded: ${state.players.length} players, ${state.matches.length} matches, ${state.events.length} events`);
+        render();
+      } catch (e) {
+        console.error('Load error:', e);
+        document.getElementById('mainContent').innerHTML = `
+          <div class="error-state">
+            <h2>⚠️ Could not load data</h2>
+            <p>Make sure Firebase is configured correctly.</p>
+            <p class="error-detail">${e.message}</p>
+          </div>`;
+      }
+    }
+    
+    // ── Navigation ──────────────────────────────────
+    window.navigate = function(page) {
+      state.page = page;
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector(`[data-page="${page}"]`);
+      if (btn) btn.classList.add('active');
+      render();
+      window.scrollTo(0, 0);
+    };
+    
+    window.setRegion = function(region) {
+      state.region = region;
+      document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-region="${region}"]`).classList.add('active');
+      render();
+    };
+    
+    // ── Admin ───────────────────────────────────────
+    window.toggleAdmin = function() {
+      const menu = document.getElementById('adminMenu');
+      menu.classList.toggle('hidden');
+    };
+    
+    window.adminLogin = async function() {
+      const email = document.getElementById('adminEmail').value;
+      const pass = document.getElementById('adminPass').value;
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        // Check custom claim
+        const token = await auth.currentUser.getIdTokenResult();
+        state.isAdmin = token.claims.admin === true;
+        state.currentUser = auth.currentUser;
+        updateAdminUI();
+        if (state.isAdmin) {
+          navigate('admin-players');
+        } else {
+          alert('You are logged in but not an admin.');
+        }
+      } catch (e) {
+        alert('Login failed: ' + e.message);
+      }
+    };
+    
+    window.adminLogout = async function() {
+      await signOut(auth);
+      state.isAdmin = false;
+      state.currentUser = null;
+      updateAdminUI();
+      navigate('home');
+    };
+    
+    function updateAdminUI() {
+      document.getElementById('adminLogin').classList.toggle('hidden', state.isAdmin);
+      document.getElementById('adminPanel').classList.toggle('hidden', !state.isAdmin);
+      const btn = document.getElementById('adminBtn');
+      btn.textContent = state.isAdmin ? '⚙️ Admin ✓' : '⚙️ Admin';
+      btn.classList.toggle('admin-active', state.isAdmin);
+    }
+    
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const token = await user.getIdTokenResult();
+        state.isAdmin = token.claims.admin === true;
+        state.currentUser = user;
+      } else {
+        state.isAdmin = false;
+        state.currentUser = null;
+      }
+      updateAdminUI();
+    });
+    
+    // ── Export stubs ────────────────────────────────
+    window.exportPDF = function() { alert('PDF export coming soon!'); };
+    window.exportSheets = function() { alert('Sheets export coming soon!'); };
+    
+    // ── Render ──────────────────────────────────────
+    function render() {
+      const main = document.getElementById('mainContent');
+      switch(state.page) {
+        case 'home': main.innerHTML = renderHome(); break;
+        case 'rankings': main.innerHTML = renderRankings(); break;
+        case 'players': main.innerHTML = renderPlayers(); break;
+        case 'events': main.innerHTML = renderEvents(); break;
+        case 'stats': main.innerHTML = renderStats(); break;
+        case 'admin-players': main.innerHTML = renderAdminPlayers(); break;
+        case 'admin-matches': main.innerHTML = renderAdminMatches(); break;
+        case 'admin-events': main.innerHTML = renderAdminEvents(); break;
+        default: main.innerHTML = renderHome();
+      }
+      // Attach any dynamic event listeners
+      attachHandlers();
+    }
+    
+    // ── Pages ───────────────────────────────────────
+    function renderHome() {
+      const totalPlayers = state.players.length;
+      const totalMatches = state.matches.length;
+      const totalEvents = state.events.length;
+      const regions = ['EU', 'NA', 'SA', 'AS'];
+      
+      let regionCards = regions.map(r => {
+        const count = state.players.filter(p => p.region === r).length;
+        const flag = REGION_FLAGS[r];
+        const color = REGION_COLORS[r];
+        return `
+          <div class="region-card" style="--accent:${color}" onclick="setRegion('${r}'); navigate('rankings')">
+            <div class="region-flag">${flag}</div>
+            <div class="region-name">${r}</div>
+            <div class="region-count">${count} players</div>
+          </div>`;
+      }).join('');
+      
+      return `
+        <div class="page-home">
+          <div class="hero">
+            <h1>PL RECORD BOOK</h1>
+            <p class="hero-sub">DW2 Pro League — Official Records & Statistics</p>
+          </div>
+          <div class="stats-bar">
+            <div class="stat-pill"><span class="stat-num">${totalPlayers}</span><span class="stat-label">Players</span></div>
+            <div class="stat-pill"><span class="stat-num">${totalMatches}</span><span class="stat-label">Matches</span></div>
+            <div class="stat-pill"><span class="stat-num">${totalEvents}</span><span class="stat-label">Events</span></div>
+          </div>
+          <div class="region-grid">${regionCards}</div>
+          <div class="home-section">
+            <h2>Recent Matches</h2>
+            <div class="match-list">${renderMatchList(state.matches.slice(-10).reverse())}</div>
+          </div>
+        </div>`;
+    }
+    
+    function renderRankings() {
+      const region = state.region;
+      let players = region === 'Global' 
+        ? [...state.players] 
+        : state.players.filter(p => p.region === region);
+      
+      players.sort((a, b) => (b.wins || 0) - (a.wins || 0));
+      
+      if (players.length === 0) {
+        return `<div class="empty-state"><p>No ranked players in ${region} yet.</p></div>`;
+      }
+      
+      let rows = players.map((p, i) => {
+        const pos = i + 1;
+        const wins = p.wins || 0;
+        const losses = p.losses || 0;
+        const total = wins + losses;
+        const winRate = total > 0 ? Math.round(wins / total * 100) : 0;
+        const flag = REGION_FLAGS[p.region] || '';
+        const tier = p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : '';
+        const aff = p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : '';
+        const avatar = p.avatarUrl 
+          ? `<img src="${p.avatarUrl}" class="player-avatar" alt="${p.name}">`
+          : `<div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`;
+        
+        return `
+          <div class="ranking-row" onclick="showPlayer('${p.id}')">
+            <div class="rank-pos">${pos === 1 ? '👑' : '#' + pos}</div>
+            ${avatar}
+            <div class="rank-info">
+              <div class="rank-name">${p.name || 'Unknown'} ${flag}</div>
+              <div class="rank-tags">${tier} ${aff}</div>
+            </div>
+            <div class="rank-record">${wins}-${losses}</div>
+            <div class="rank-winrate">${winRate}%</div>
+          </div>`;
+      }).join('');
+      
+      return `
+        <div class="page-rankings">
+          <h2>${REGION_FLAGS[region]} ${region} Rankings</h2>
+          <div class="ranking-list">${rows}</div>
+        </div>`;
+    }
+    
+    function renderPlayers() {
+      let players = state.region === 'Global' 
+        ? [...state.players] 
+        : state.players.filter(p => p.region === state.region);
+      
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        players = players.filter(p => p.name?.toLowerCase().includes(q));
+      }
+      
+      players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      
+      return `
+        <div class="page-players">
+          <div class="search-bar">
+            <input type="text" placeholder="Search player..." id="playerSearch" 
+              value="${state.searchQuery}" oninput="onSearch(this.value)">
+          </div>
+          <div class="player-grid">
+            ${players.map(p => {
+              const flag = REGION_FLAGS[p.region] || '';
+              const tier = p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : '';
+              const wins = p.wins || 0;
+              const losses = p.losses || 0;
+              const avatar = p.avatarUrl 
+                ? `<img src="${p.avatarUrl}" class="player-avatar" alt="${p.name}">`
+                : `<div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`;
+              return `
+                <div class="player-card" onclick="showPlayer('${p.id}')">
+                  ${avatar}
+                  <div class="player-card-name">${p.name || 'Unknown'} ${flag}</div>
+                  <div class="player-card-tags">${tier}</div>
+                  <div class="player-card-record">${wins}W - ${losses}L</div>
+                </div>`;
+            }).join('') || '<p class="empty-state">No players found.</p>'}
+          </div>
+        </div>`;
+    }
+    
+    function renderEvents() {
+      const events = [...state.events].sort((a, b) => 
+        new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)
+      );
+      
+      if (events.length === 0) {
+        return `<div class="empty-state"><p>No events yet.</p></div>`;
+      }
+      
+      return `
+        <div class="page-events">
+          <h2>Events</h2>
+          <div class="event-list">
+            ${events.map(e => {
+              const date = e.date ? new Date(e.date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : 'TBD';
+              const status = e.completed ? '<span class="event-status completed">Completed</span>' : '<span class="event-status upcoming">Upcoming</span>';
+              const type = e.isTournament ? '🏆 Tournament' : '🥊 Fight Night';
+              return `
+                <div class="event-card">
+                  <div class="event-date">${date}</div>
+                  <div class="event-info">
+                    <div class="event-name">${e.name}</div>
+                    <div class="event-type">${type} ${status}</div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+    
+    function renderStats() {
+      const totalPlayers = state.players.length;
+      const totalMatches = state.matches.length;
+      const regions = ['EU', 'NA', 'SA', 'AS'];
+      
+      let regionStats = regions.map(r => {
+        const players = state.players.filter(p => p.region === r);
+        const matches = state.matches.filter(m => {
+          const player = state.players.find(p => p.id === m.playerId);
+          return player && player.region === r;
+        });
+        const wins = players.reduce((s, p) => s + (p.wins || 0), 0);
+        const losses = players.reduce((s, p) => s + (p.losses || 0), 0);
+        return { region: r, players: players.length, matches: matches.length, wins, losses };
+      });
+      
+      let tierDist = {};
+      state.players.forEach(p => {
+        if (p.tier) tierDist[p.tier] = (tierDist[p.tier] || 0) + 1;
+      });
+      
+      let fotnCount = state.matches.filter(m => m.fotn).length;
+      let forfeitCount = state.matches.filter(m => m.forfeit).length;
+      
+      return `
+        <div class="page-stats">
+          <h2>League Statistics</h2>
+          <div class="stats-grid">
+            <div class="stat-card"><div class="stat-big">${totalPlayers}</div><div class="stat-label">Total Players</div></div>
+            <div class="stat-card"><div class="stat-big">${totalMatches}</div><div class="stat-label">Total Matches</div></div>
+            <div class="stat-card"><div class="stat-big">${fotnCount}</div><div class="stat-label">FOTNs</div></div>
+            <div class="stat-card"><div class="stat-big">${forfeitCount}</div><div class="stat-label">Forfeits</div></div>
+          </div>
+          <div class="stats-section">
+            <h3>By Region</h3>
+            <div class="region-stats">
+              ${regionStats.map(rs => `
+                <div class="region-stat-row">
+                  <span class="region-flag">${REGION_FLAGS[rs.region]}</span>
+                  <span class="region-name">${rs.region}</span>
+                  <span>${rs.players} players</span>
+                  <span>${rs.matches} matches</span>
+                  <span>${rs.wins}W / ${rs.losses}L</span>
+                </div>`).join('')}
+            </div>
+          </div>
+          ${Object.keys(tierDist).length > 0 ? `
+            <div class="stats-section">
+              <h3>Tier Distribution</h3>
+              <div class="tier-dist">
+                ${Object.entries(tierDist).sort().map(([tier, count]) => `
+                  <div class="tier-row">
+                    <span class="tier-badge tier-${tier.toLowerCase()}">${tier}</span>
+                    <div class="tier-bar"><div class="tier-fill" style="width:${(count/totalPlayers*100)}%"></div></div>
+                    <span>${count}</span>
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+        </div>`;
+    }
+    
+    function renderMatchList(matches) {
+      if (!matches || matches.length === 0) return '<p class="empty-state">No matches recorded yet.</p>';
+      return matches.map(m => {
+        const player = state.players.find(p => p.id === m.playerId);
+        const resultClass = m.result?.toLowerCase() || 'draw';
+        const fotn = m.fotn ? '<span class="fotn-badge">🎬 FOTN</span>' : '';
+        const forfeit = m.forfeit ? '<span class="forfeit-badge">FF</span>' : '';
+        const vod = m.vod ? `<a href="${m.vod}" target="_blank" class="vod-link">▶ VOD</a>` : '';
+        const rounds = m.rounds ? ` (${m.rounds})` : '';
+        return `
+          <div class="match-row">
+            <div class="match-result ${resultClass}">${m.result || '?'}</div>
+            <div class="match-players">
+              <span class="match-player" onclick="showPlayer('${m.playerId}')">${player?.name || '?'}</span>
+              <span class="match-vs">vs</span>
+              <span class="match-opponent">${m.opponent || '?'}</span>
+            </div>
+            <div class="match-score">${m.score || ''}${rounds} ${forfeit} ${fotn}</div>
+            <div class="match-event">${m.event || ''}</div>
+            <div>${vod}</div>
+          </div>`;
+      }).join('');
+    }
+    
+    // ── Admin Pages ─────────────────────────────────
+    function renderAdminPlayers() {
+      if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
+      return `
+        <div class="page-admin">
+          <h2>Manage Players</h2>
+          <div class="admin-form" id="playerForm">
+            <h3>Add New Player</h3>
+            <div class="form-grid">
+              <input type="text" id="pName" placeholder="Player name" class="admin-input">
+              <select id="pRegion" class="admin-input">
+                <option value="EU">🇪🇺 EU</option>
+                <option value="NA">🇺🇸 NA</option>
+                <option value="SA">🌎 SA</option>
+                <option value="AS">🇰🇷 AS</option>
+              </select>
+              <input type="text" id="pTier" placeholder="Tier (S, A, B, C, D, F)" class="admin-input">
+              <input type="text" id="pAff" placeholder="Affiliation (optional)" class="admin-input">
+              <button class="admin-submit" onclick="addPlayer()">Add Player</button>
+            </div>
+          </div>
+          <div class="admin-list">
+            <h3>Current Players (${state.players.length})</h3>
+            <div class="admin-player-list">
+              ${state.players.map(p => `
+                <div class="admin-row">
+                  <span>${p.name} — ${p.region} ${p.tier || ''} ${p.affiliation || ''}</span>
+                  <button class="admin-delete" onclick="deletePlayer('${p.id}')">Delete</button>
+                </div>`).join('') || '<p>No players yet.</p>'}
+            </div>
+          </div>
+        </div>`;
+    }
+    
+    function renderAdminMatches() {
+      if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
+      const playerOptions = state.players.map(p => `<option value="${p.id}">${p.name} (${p.region})</option>`).join('');
+      const eventOptions = state.events.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
+      
+      return `
+        <div class="page-admin">
+          <h2>Add Match</h2>
+          <div class="admin-form">
+            <div class="form-grid">
+              <select id="mPlayer" class="admin-input"><option value="">Select player...</option>${playerOptions}</select>
+              <input type="text" id="mOpponent" placeholder="Opponent name" class="admin-input">
+              <select id="mResult" class="admin-input">
+                <option value="Win">Win</option>
+                <option value="Loss">Loss</option>
+                <option value="Draw">Draw</option>
+                <option value="NC">NC</option>
+              </select>
+              <input type="text" id="mScore" placeholder="Score (e.g. 3-2)" class="admin-input">
+              <input type="text" id="mRounds" placeholder="Rounds (e.g. 2-1)" class="admin-input">
+              <select id="mEvent" class="admin-input"><option value="">Select event...</option>${eventOptions}</select>
+              <input type="text" id="mVod" placeholder="VOD URL (optional)" class="admin-input">
+              <div class="form-checks">
+                <label><input type="checkbox" id="mFotn"> 🎬 Fight of the Night</label>
+                <label><input type="checkbox" id="mForfeit"> Forfeit</label>
+              </div>
+              <input type="text" id="mNotes" placeholder="Notes (optional)" class="admin-input">
+              <button class="admin-submit" onclick="addMatch()">Add Match</button>
+            </div>
+          </div>
+        </div>`;
+    }
+    
+    function renderAdminEvents() {
+      if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
+      return `
+        <div class="page-admin">
+          <h2>Manage Events</h2>
+          <div class="admin-form">
+            <h3>Add Event</h3>
+            <div class="form-grid">
+              <input type="text" id="eName" placeholder="Event name (e.g. Fight Night #16)" class="admin-input">
+              <input type="date" id="eDate" class="admin-input">
+              <label><input type="checkbox" id="eTournament"> 🏆 Tournament</label>
+              <button class="admin-submit" onclick="addEvent()">Add Event</button>
+            </div>
+          </div>
+          <div class="admin-list">
+            <h3>Events (${state.events.length})</h3>
+            <div class="admin-event-list">
+              ${state.events.sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).map(e => `
+                <div class="admin-row">
+                  <span>${e.name} — ${e.date ? new Date(e.date).toLocaleDateString() : 'TBD'} ${e.isTournament ? '🏆' : ''}</span>
+                  <button class="admin-delete" onclick="deleteEvent('${e.id}')">Delete</button>
+                </div>`).join('') || '<p>No events yet.</p>'}
+            </div>
+          </div>
+        </div>`;
+    }
+    
+    // ── Admin Actions ───────────────────────────────
+    window.addPlayer = async function() {
+      const name = document.getElementById('pName').value.trim();
+      const region = document.getElementById('pRegion').value;
+      const tier = document.getElementById('pTier').value.trim();
+      const aff = document.getElementById('pAff').value.trim();
+      if (!name) return alert('Name required');
+      
+      await addDoc(collection(db, 'players'), {
+        name, region, tier: tier || null, affiliation: aff || null,
+        wins: 0, losses: 0, createdAt: Date.now()
+      });
+      
+      document.getElementById('pName').value = '';
+      document.getElementById('pTier').value = '';
+      document.getElementById('pAff').value = '';
+      await loadData();
+    };
+    
+    window.deletePlayer = async function(id) {
+      if (!confirm('Delete this player? This will NOT delete their matches.')) return;
+      await deleteDoc(doc(db, 'players', id));
+      await loadData();
+    };
+    
+    window.addMatch = async function() {
+      const playerId = document.getElementById('mPlayer').value;
+      const opponent = document.getElementById('mOpponent').value.trim();
+      const result = document.getElementById('mResult').value;
+      const score = document.getElementById('mScore').value.trim();
+      const rounds = document.getElementById('mRounds').value.trim();
+      const event = document.getElementById('mEvent').value;
+      const vod = document.getElementById('mVod').value.trim();
+      const fotn = document.getElementById('mFotn').checked;
+      const forfeit = document.getElementById('mForfeit').checked;
+      const notes = document.getElementById('mNotes').value.trim();
+      
+      if (!playerId || !opponent) return alert('Player and opponent required');
+      
+      await addDoc(collection(db, 'matches'), {
+        playerId, opponent, result, score, rounds, event, vod, fotn, forfeit, notes,
+        createdAt: Date.now()
+      });
+      
+      // Update player W/L
+      const player = state.players.find(p => p.id === playerId);
+      if (player) {
+        const updates = {};
+        if (result === 'Win') updates.wins = (player.wins || 0) + 1;
+        else if (result === 'Loss') updates.losses = (player.losses || 0) + 1;
+        await updateDoc(doc(db, 'players', playerId), updates);
+      }
+      
+      await loadData();
+      // Clear form
+      document.getElementById('mOpponent').value = '';
+      document.getElementById('mScore').value = '';
+      document.getElementById('mRounds').value = '';
+      document.getElementById('mVod').value = '';
+      document.getElementById('mNotes').value = '';
+      document.getElementById('mFotn').checked = false;
+      document.getElementById('mForfeit').checked = false;
+    };
+    
+    window.addEvent = async function() {
+      const name = document.getElementById('eName').value.trim();
+      const date = document.getElementById('eDate').value;
+      const isTournament = document.getElementById('eTournament').checked;
+      if (!name) return alert('Event name required');
+      
+      await addDoc(collection(db, 'events'), {
+        name, date: date ? new Date(date).toISOString() : null,
+        isTournament, completed: false, createdAt: Date.now()
+      });
+      
+      document.getElementById('eName').value = '';
+      document.getElementById('eDate').value = '';
+      document.getElementById('eTournament').checked = false;
+      await loadData();
+    };
+    
+    window.deleteEvent = async function(id) {
+      if (!confirm('Delete this event?')) return;
+      await deleteDoc(doc(db, 'events', id));
+      await loadData();
+    };
+    
+    window.showPlayer = function(id) {
+      const p = state.players.find(x => x.id === id);
+      if (!p) return;
+      const matches = state.matches.filter(m => m.playerId === id);
+      const wins = p.wins || 0;
+      const losses = p.losses || 0;
+      const total = wins + losses;
+      const winRate = total > 0 ? Math.round(wins / total * 100) : 0;
+      const fotns = matches.filter(m => m.fotn).length;
+      
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.onclick = () => modal.remove();
+      modal.innerHTML = `
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <div class="player-modal-header" style="--accent:${REGION_COLORS[p.region]||'#666'}">
+            ${p.avatarUrl 
+              ? `<img src="${p.avatarUrl}" class="player-avatar large" alt="${p.name}">`
+              : `<div class="player-avatar large placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`}
+            <h2>${p.name} ${REGION_FLAGS[p.region]||''}</h2>
+            <div class="player-modal-tags">
+              ${p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : ''}
+              ${p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : ''}
+            </div>
+          </div>
+          <div class="player-modal-stats">
+            <div class="modal-stat"><span class="modal-stat-num">${wins}-${losses}</span><span class="modal-stat-label">Record</span></div>
+            <div class="modal-stat"><span class="modal-stat-num">${winRate}%</span><span class="modal-stat-label">Win Rate</span></div>
+            <div class="modal-stat"><span class="modal-stat-num">${total}</span><span class="modal-stat-label">Matches</span></div>
+            <div class="modal-stat"><span class="modal-stat-num">${fotns}</span><span class="modal-stat-label">FOTNs</span></div>
+          </div>
+          <div class="player-modal-history">
+            <h3>Match History</h3>
+            ${matches.length > 0 ? `<div class="match-list">${renderMatchList(matches.reverse())}</div>` : '<p>No matches recorded.</p>'}
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    };
+    
+    window.onSearch = function(val) {
+      state.searchQuery = val;
+      render();
+      // Refocus
+      const input = document.getElementById('playerSearch');
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    };
+    
+    function attachHandlers() {
+      // Close admin menu on outside click
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#adminBtn') && !e.target.closest('#adminMenu')) {
+          document.getElementById('adminMenu')?.classList.add('hidden');
+        }
+      });
+    }
+    
+    // ── Constants ───────────────────────────────────
+    const REGION_FLAGS = { EU:'🇪🇺', NA:'🇺🇸', SA:'🌎', AS:'🇰🇷', Global:'🌍' };
+    const REGION_COLORS = { EU:'#003BB5', NA:'#BF0000', SA:'#009C3B', AS:'#FF6600', Global:'#00BFFF' };
+    
+    // ── Init ────────────────────────────────────────
+    loadData();
+  </script>
+</body>
+</html>
