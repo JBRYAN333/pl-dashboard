@@ -76,7 +76,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getFirestore, collection, getDocs, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getFirestore, collection, getDocs, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     
     // ── Config ──────────────────────────────────────
@@ -160,15 +160,16 @@
       const pass = document.getElementById('adminPass').value;
       try {
         await signInWithEmailAndPassword(auth, email, pass);
-        // Check custom claim
-        const token = await auth.currentUser.getIdTokenResult();
-        state.isAdmin = token.claims.admin === true;
-        state.currentUser = auth.currentUser;
-        updateAdminUI();
-        if (state.isAdmin) {
+        // Check admin doc in Firestore
+        const adminDoc = await getDoc(doc(db, 'admins', 'admin_user'));
+        if (adminDoc.exists() && adminDoc.data().uid === auth.currentUser.uid) {
+          state.isAdmin = true;
+          state.currentUser = auth.currentUser;
+          updateAdminUI();
           navigate('admin-players');
         } else {
           alert('You are logged in but not an admin.');
+          state.isAdmin = false;
         }
       } catch (e) {
         alert('Login failed: ' + e.message);
@@ -193,8 +194,14 @@
     
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const token = await user.getIdTokenResult();
-        state.isAdmin = token.claims.admin === true;
+        // Check admin doc
+        try {
+          const adminDoc = await getDoc(doc(db, 'admins', 'admin_user'));
+          state.isAdmin = adminDoc.exists() && adminDoc.data().uid === user.uid;
+        } catch(e) {
+          console.error('Admin check failed:', e);
+          state.isAdmin = false;
+        }
         state.currentUser = user;
       } else {
         state.isAdmin = false;

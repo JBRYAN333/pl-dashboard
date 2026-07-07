@@ -2,48 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // ── Admin check: user is admin if admins/admin_user has their UID ──
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/admin_user)
+        && get(/databases/$(database)/documents/admins/admin_user).data.uid == request.auth.uid;
+    }
+    
     // ── Players ──────────────────────────────────────
     match /players/{playerId} {
-      // Leitura: público (dashboard não precisa de login)
       allow read: if true;
-      
-      // Escrita: só admins
       allow create, update, delete: if isAdmin();
-      
-      // Validação de campos
-      function isValidPlayer() {
-        return request.resource.data.name is string
-          && request.resource.data.name.size() > 0
-          && request.resource.data.name.size() <= 40
-          && request.resource.data.region in ['EU', 'NA', 'SA', 'AS', 'Global']
-          && (request.resource.data.tier is string || !('tier' in request.resource.data))
-          && (request.resource.data.affiliation is string || !('affiliation' in request.resource.data))
-          && (request.resource.data.wins is int || !('wins' in request.resource.data))
-          && (request.resource.data.losses is int || !('losses' in request.resource.data));
-      }
-      allow create: if isAdmin() && isValidPlayer();
-      allow update: if isAdmin() && isValidPlayer();
     }
     
     // ── Matches ──────────────────────────────────────
     match /matches/{matchId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
-      
-      function isValidMatch() {
-        return request.resource.data.playerId is string
-          && request.resource.data.opponent is string
-          && request.resource.data.result in ['Win', 'Loss', 'Draw', 'NC']
-          && (request.resource.data.score is string || !('score' in request.resource.data))
-          && (request.resource.data.rounds is string || !('rounds' in request.resource.data))
-          && (request.resource.data.event is string || !('event' in request.resource.data))
-          && (request.resource.data.vod is string || !('vod' in request.resource.data))
-          && (request.resource.data.fotn is bool || !('fotn' in request.resource.data))
-          && (request.resource.data.forfeit is bool || !('forfeit' in request.resource.data))
-          && (request.resource.data.notes is string || !('notes' in request.resource.data));
-      }
-      allow create: if isAdmin() && isValidMatch();
-      allow update: if isAdmin() && isValidMatch();
     }
     
     // ── Events ───────────────────────────────────────
@@ -58,10 +33,10 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     
-    // ── Admin helpers ─────────────────────────────────
-    function isAdmin() {
-      return request.auth != null
-        && request.auth.token.admin == true;
+    // ── Admin docs (only admin can read/write) ───────
+    match /admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }
