@@ -9,7 +9,7 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 
 // ── Config ──────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyDvDk-x18TQ-nI",
+  apiKey: "AIzaSyDvDk5aoU-UDidEnn5HowUyRQLdatTQ-nI",
   authDomain: "pl-dashboard-f7315.firebaseapp.com",
   projectId: "pl-dashboard-f7315",
   storageBucket: "pl-dashboard-f7315.firebasestorage.app",
@@ -202,15 +202,85 @@ onAuthStateChanged(auth, async (user) => {
   updateAdminUI();
 });
 
-window.exportPDF = function() { alert('PDF export coming soon!'); };
-window.exportSheets = function() { alert('Sheets export coming soon!'); };
+window.exportPDF = function() {
+  const regions = ['EU','NA','SA','AS'];
+  const regionNames = { EU:'Europe', NA:'North America', SA:'South America', AS:'Asia' };
+  let html = `
+    <style>
+      @page { size: A4 landscape; margin: 1.5cm; }
+      body { font-family: 'Inter', Arial, sans-serif; color: #1a1a1a; font-size: 11px; }
+      h1 { text-align: center; font-size: 24px; margin-bottom: 4px; letter-spacing: 2px; }
+      .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 24px; }
+      h2 { font-size: 18px; border-bottom: 2px solid #333; padding-bottom: 4px; margin: 20px 0 10px; }
+      .section { margin-bottom: 16px; page-break-inside: avoid; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
+      th { background: #1a1a1a; color: #fff; padding: 4px 6px; text-align: left; font-weight: 600; border: 1px solid #333; }
+      td { padding: 3px 6px; border: 1px solid #ddd; }
+      .player-name { font-weight: 600; margin: 10px 0 2px; font-size: 12px; }
+      .fotn { background: #fff8e0; }
+      .vod-link { color: #06c; }
+    </style>
+    <h1>DW2PL RECORD BOOK</h1>
+    <p class="subtitle">Generated ${new Date().toLocaleDateString()} · ${state.players.length} players · ${state.matches.length} matches</p>`;
+
+  for (const region of regions) {
+    const rPlayers = state.players.filter(p => inRegion(p, region));
+    if (!rPlayers.length) continue;
+    const rMatches = state.matches.filter(m => m.region === region);
+    html += `<div class="section"><h2>${region} — ${regionNames[region] || region}</h2>
+    <table><thead><tr><th>Pos</th><th>Player</th><th>Affiliation</th><th>Wins</th><th>Losses</th><th>MP</th><th>WR%</th></tr></thead><tbody>`;
+    rPlayers.sort((a,b) => (b.totalWins||0) - (a.totalWins||0)).forEach((p,i) => {
+      const wr = ((p.totalWins||0)+(p.totalLosses||0)) > 0 ? Math.round((p.totalWins||0)/((p.totalWins||0)+(p.totalLosses||0))*100) : 0;
+      html += `<tr><td>${i+1}</td><td>${p.name}</td><td>${p.affiliation||'-'}</td><td>${p.totalWins||0}</td><td>${p.totalLosses||0}</td><td>${(p.totalWins||0)+(p.totalLosses||0)}</td><td>${wr}%</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // matches per region
+    const byPlayer = {};
+    rMatches.forEach(m => {
+      [m.player1, m.player2].forEach(name => {
+        if (!byPlayer[name]) byPlayer[name] = [];
+        byPlayer[name].push(m);
+      });
+    });
+    for (const [pName, pMatches] of Object.entries(byPlayer)) {
+      html += `<div class="player-name">${pName} (${pMatches.length} matches)</div><table><thead><tr><th>Result</th><th>Opponent</th><th>Score</th><th>Rounds</th><th>Event</th><th>FOTN</th><th>VOD</th></tr></thead><tbody>`;
+      pMatches.forEach(m => {
+        const opp = m.player1 === pName ? m.player2 : m.player1;
+        html += `<tr><td>${m.player1 === pName ? 'Win' : 'Loss'}</td><td>${opp}</td><td>${m.score||'-'}</td><td>${m.rounds||'-'}</td><td>${m.event||'-'}</td><td>${m.fotn?'🌟':''}</td><td>${m.vod?'<a href="'+m.vod+'">VOD</a>':'-'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+  }
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+};
+window.exportSheets = function() {
+  let csv = 'Player,Region,Wins,Losses,Win Rate,Affiliation\n';
+  state.players.forEach(p => {
+    const wr = ((p.totalWins||0)+(p.totalLosses||0)) > 0 ? Math.round((p.totalWins||0)/((p.totalWins||0)+(p.totalLosses||0))*100) : 0;
+    csv += `"${p.name}","${p.primaryRegion||'Global'}",${p.totalWins||0},${p.totalLosses||0},${wr}%,"${p.affiliation||''}"\n`;
+  });
+  csv += '\nPlayer1,Player2,Score,Rounds,Event,Region,FOTN,Title Fight\n';
+  state.matches.forEach(m => {
+    csv += `"${m.player1||''}","${m.player2||''}","${m.score||''}","${m.rounds||''}","${m.event||''}","${m.region||''}",${m.fotn||false},${m.titleFight||false}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'pl_records_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
 
 // ── Render dispatch ─────────────────────────────
 function render() {
   const main = document.getElementById('mainContent');
   const pages = {
     home: renderHome, rankings: renderRankings, players: renderPlayers,
-    events: renderEvents, stats: renderStats,
+    fotn: renderFotn, events: renderEvents, champs: renderChamps, stats: renderStats,
     'admin-players': renderAdminPlayers, 'admin-matches': renderAdminMatches, 'admin-events': renderAdminEvents
   };
   main.innerHTML = (pages[state.page] || renderHome)();
@@ -391,6 +461,107 @@ function renderEvents() {
   </div>`;
 }
 
+// ── FOTN ────────────────────────────────────────
+function renderFotn() {
+  const fotnMatches = state.matches.filter(m => m.fotn);
+  if (!fotnMatches.length) return '<div class="empty-state"><p>No FOTN matches recorded yet.</p></div>';
+
+  let fp = {};
+  fotnMatches.forEach(m => {
+    if (m.player1) fp[m.player1] = (fp[m.player1] || 0) + 1;
+    if (m.player2) fp[m.player2] = (fp[m.player2] || 0) + 1;
+  });
+  const topFotn = Object.entries(fp).sort((a,b) => b[1] - a[1]);
+
+  const sorted = [...fotnMatches].sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+  return `<div class="page-fotn">
+    <h2>🌟 Fight of the Night Awards</h2>
+    <div class="stats-bar">
+      <div class="stat-pill"><span class="stat-num">${fotnMatches.length}</span><span class="stat-label">FOTN Matches</span></div>
+      <div class="stat-pill"><span class="stat-num">${topFotn.length}</span><span class="stat-label">Unique Winners</span></div>
+    </div>
+    ${topFotn.length ? `<div class="stats-section"><h3>🏆 Most FOTN Wins</h3><div class="ranking-list">
+      ${topFotn.map(([name, count], i) => {
+        const p = state.playerByName[name.toLowerCase()];
+        return `<div class="ranking-row" onclick="showPlayerByName('${esc(name)}')">
+          <div class="rank-pos">#${i+1}</div>
+          ${avatar(p || {name, primaryRegion:'Global'})}
+          <div class="rank-info"><div class="rank-name">${name}</div></div>
+          <div class="rank-record">🌟 ${count}</div>
+        </div>`;
+      }).join('')}
+    </div></div>` : ''}
+    <div class="stats-section"><h3>📜 All FOTN Matches</h3><div class="match-list">${renderMatchList(sorted)}</div></div>
+  </div>`;
+}
+
+// ── CHAMPIONSHIP HISTORY ────────────────────────
+function renderChamps() {
+  const regions = ['EU','NA','SA','AS'];
+  const champs = state.players.filter(p => isChampion(p));
+
+  const regionChamps = regions.map(r => {
+    const rChamps = champs.filter(p => {
+      const regs = getRegions(p);
+      return regs[r] && regs[r].pos === 'Champion';
+    });
+    return { region: r, players: rChamps };
+  });
+
+  let topWins = [...state.players].filter(p => (p.totalWins||0) > 0)
+    .sort((a,b) => (b.totalWins||0) - (a.totalWins||0)).slice(0, 5);
+
+  let topWr = [...state.players].filter(p => (p.totalWins||0) + (p.totalLosses||0) >= 10)
+    .sort((a,b) => {
+      const wa = (a.totalWins||0) / ((a.totalWins||0)+(a.totalLosses||0)||1);
+      const wb = (b.totalWins||0) / ((b.totalWins||0)+(b.totalLosses||0)||1);
+      return wb - wa;
+    }).slice(0, 5);
+
+  return `<div class="page-champs">
+    <h2>🏆 Championship History & Records</h2>
+    ${regionChamps.map(({region, players}) => `
+      <div class="stats-section"><h3>${FLAGS[region]} ${region} Champions</h3>
+      ${players.length ? `<div class="ranking-list">${players.map(p => {
+        const regs = getRegions(p);
+        const rInfo = regs[region] || {};
+        return `<div class="ranking-row" onclick="showPlayerByName('${esc(p.name)}')">
+          <div class="rank-pos">👑</div>${avatar(p)}
+          <div class="rank-info"><div class="rank-name">${p.name}</div>
+          <div class="rank-tags">${p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : ''}</div></div>
+          <div class="rank-record">${rInfo.wins||0}-${rInfo.losses||0}</div>
+        </div>`;
+      }).join('')}</div>` : '<p class="empty-state">No champion</p>'}
+      </div>`
+    ).join('')}
+    <div class="stats-section"><h3>🥇 Top 5 All-Time Wins</h3><div class="ranking-list">
+      ${topWins.map((p, i) => {
+        const w = p.totalWins||0, l = p.totalLosses||0;
+        const wr = w+l > 0 ? Math.round(w/(w+l)*100) : 0;
+        return `<div class="ranking-row" onclick="showPlayerByName('${esc(p.name)}')">
+          <div class="rank-pos">#${i+1}</div>${avatar(p)}
+          <div class="rank-info"><div class="rank-name">${p.name}</div>
+          <div class="rank-tags">${getRegionTags(p)}</div></div>
+          <div class="rank-record">${w}-${l}</div><div class="rank-winrate">${wr}%</div>
+        </div>`;
+      }).join('')}
+    </div></div>
+    <div class="stats-section"><h3>📊 Top 5 Win Rate (min. 10 matches)</h3><div class="ranking-list">
+      ${topWr.map((p, i) => {
+        const w = p.totalWins||0, l = p.totalLosses||0;
+        const wr = Math.round(w/(w+l)*100);
+        return `<div class="ranking-row" onclick="showPlayerByName('${esc(p.name)}')">
+          <div class="rank-pos">#${i+1}</div>${avatar(p)}
+          <div class="rank-info"><div class="rank-name">${p.name}</div>
+          <div class="rank-tags">${getRegionTags(p)}</div></div>
+          <div class="rank-record">${w}-${l}</div><div class="rank-winrate">${wr}%</div>
+        </div>`;
+      }).join('')}
+    </div></div>
+  </div>`;
+}
+
 // ── STATS ───────────────────────────────────────
 function renderStats() {
   const tp = state.players.length, tm = state.matches.length;
@@ -462,13 +633,14 @@ function renderMatchList(matches) {
     const title = m.titleFight ? '<span class="title-badge">🏆 Title</span>' : '';
     const vod = m.vod ? `<a href="${m.vod}" target="_blank" class="vod-link">▶ Watch</a>` : '';
     const notes = m.notes ? `<div class="match-notes">${m.notes}</div>` : '';
+    const rounds = m.rounds ? `<span class="rounds-badge">⚔ ${m.rounds}</span>` : '';
     return `<div class="match-row">
       <div class="match-players">
         <span class="match-player" onclick="showPlayerByName('${esc(p1)}')">${p1}</span>
         <span class="match-vs">vs</span>
         <span class="match-opponent" onclick="showPlayerByName('${esc(p2)}')">${p2}</span>
       </div>
-      <div class="match-score">${m.score || ''} ${fotn} ${title}</div>
+      <div class="match-score">${m.score || ''} ${rounds} ${fotn} ${title}</div>
       <div class="match-event">${m.event || ''}</div>
       ${notes}<div>${vod}</div>
     </div>`;
@@ -589,6 +761,7 @@ function renderAdminMatches() {
     <input type="text" id="mP1" placeholder="Player 1" class="admin-input">
     <input type="text" id="mP2" placeholder="Player 2" class="admin-input">
     <input type="text" id="mScore" placeholder="Score (e.g. 9102-6853)" class="admin-input">
+    <input type="text" id="mRounds" placeholder="Rounds (e.g. 2-1, 2-0)" class="admin-input">
     <select id="mRegion" class="admin-input"><option value="EU">EU</option><option value="NA">NA</option><option value="SA">SA</option><option value="AS">AS</option><option value="Global">Global</option></select>
     <select id="mEvent" class="admin-input"><option value="">Event...</option>${evOpts}</select>
     <input type="text" id="mVod" placeholder="YouTube URL" class="admin-input">
@@ -643,6 +816,7 @@ window.addMatch = async function() {
   await addDoc(collection(db,'matches'), {
     player1:p1, player2:p2,
     score: document.getElementById('mScore').value.trim(),
+    rounds: document.getElementById('mRounds').value.trim(),
     region: document.getElementById('mRegion').value,
     event: document.getElementById('mEvent').value,
     vod: document.getElementById('mVod').value.trim(),
@@ -651,7 +825,7 @@ window.addMatch = async function() {
     titleFight: document.getElementById('mTitle').checked,
     createdAt: Date.now()
   });
-  ['mP1','mP2','mScore','mVod','mNotes'].forEach(id => document.getElementById(id).value = '');
+  ['mP1','mP2','mScore','mRounds','mVod','mNotes'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('mFotn').checked = false; document.getElementById('mTitle').checked = false;
   await loadData();
 };
