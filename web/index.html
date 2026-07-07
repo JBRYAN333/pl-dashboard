@@ -100,11 +100,15 @@
       players: [],
       matches: [],
       events: [],
-      rankings: [],
       currentUser: null,
       isAdmin: false,
       searchQuery: ''
     };
+    
+    // ── Constants ───────────────────────────────────
+    const REGION_FLAGS = { EU:'EU', NA:'NA', SA:'SA', AS:'AS', Global:'ALL' };
+    const REGION_COLORS = { EU:'#c0c0c0', NA:'#808080', SA:'#a0a0a0', AS:'#909090', Global:'#f7f5f6' };
+    const ALL_REGIONS = ['EU', 'NA', 'SA', 'AS', 'Global'];
     
     // ── Data Loading ────────────────────────────────
     async function loadData() {
@@ -119,6 +123,12 @@
         state.matches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         state.events = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         
+        // Build player lookup map by name (for match linking)
+        state.playerByName = {};
+        state.players.forEach(p => {
+          if (p.name) state.playerByName[p.name.toLowerCase()] = p;
+        });
+        
         console.log(`Loaded: ${state.players.length} players, ${state.matches.length} matches, ${state.events.length} events`);
         render();
       } catch (e) {
@@ -130,6 +140,32 @@
             <p class="error-detail">${e.message}</p>
           </div>`;
       }
+    }
+    
+    // ── Helpers ─────────────────────────────────────
+    // Get matches for a player by name (checks both player1 and player2)
+    function getMatchesForPlayer(playerName) {
+      const ln = playerName.toLowerCase();
+      return state.matches.filter(m => 
+        (m.player1 && m.player1.toLowerCase() === ln) ||
+        (m.player2 && m.player2.toLowerCase() === ln)
+      );
+    }
+    
+    // Calculate FOTN count for a player
+    function getFotnCount(playerName) {
+      return getMatchesForPlayer(playerName).filter(m => m.fotn).length;
+    }
+    
+    // Check if player is a champion (position === 'Champion')
+    function isChampion(player) {
+      return player.position === 'Champion' || (player.position && player.position.toLowerCase().includes('champion'));
+    }
+    
+    // Get region for a player
+    function getPlayerRegion(name) {
+      const p = state.playerByName[name.toLowerCase()];
+      return p ? p.region : 'Global';
     }
     
     // ── Navigation ──────────────────────────────────
@@ -160,7 +196,6 @@
       const pass = document.getElementById('adminPass').value;
       try {
         await signInWithEmailAndPassword(auth, email, pass);
-        // Check admin doc in Firestore
         const adminDoc = await getDoc(doc(db, 'admins', 'admin_user'));
         if (adminDoc.exists() && adminDoc.data().uid === auth.currentUser.uid) {
           state.isAdmin = true;
@@ -194,12 +229,10 @@
     
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Check admin doc
         try {
           const adminDoc = await getDoc(doc(db, 'admins', 'admin_user'));
           state.isAdmin = adminDoc.exists() && adminDoc.data().uid === user.uid;
         } catch(e) {
-          console.error('Admin check failed:', e);
           state.isAdmin = false;
         }
         state.currentUser = user;
@@ -228,28 +261,29 @@
         case 'admin-events': main.innerHTML = renderAdminEvents(); break;
         default: main.innerHTML = renderHome();
       }
-      // Attach any dynamic event listeners
       attachHandlers();
     }
     
-    // ── Pages ───────────────────────────────────────
+    // ── Home ────────────────────────────────────────
     function renderHome() {
       const totalPlayers = state.players.length;
       const totalMatches = state.matches.length;
       const totalEvents = state.events.length;
+      const totalFotn = state.matches.filter(m => m.fotn).length;
       const regions = ['EU', 'NA', 'SA', 'AS'];
       
       let regionCards = regions.map(r => {
         const count = state.players.filter(p => p.region === r).length;
-        const flag = REGION_FLAGS[r];
-        const color = REGION_COLORS[r];
         return `
-          <div class="region-card" style="--accent:${color}" onclick="setRegion('${r}'); navigate('rankings')">
-            <div class="region-flag">${flag}</div>
+          <div class="region-card" style="--accent:${REGION_COLORS[r]}" onclick="setRegion('${r}'); navigate('rankings')">
+            <div class="region-flag">${REGION_FLAGS[r]}</div>
             <div class="region-name">${r}</div>
             <div class="region-count">${count} players</div>
           </div>`;
       }).join('');
+      
+      // Recent matches (last 15)
+      const recent = [...state.matches].sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).slice(0, 15);
       
       return `
         <div class="page-home">
@@ -261,22 +295,35 @@
             <div class="stat-pill"><span class="stat-num">${totalPlayers}</span><span class="stat-label">Players</span></div>
             <div class="stat-pill"><span class="stat-num">${totalMatches}</span><span class="stat-label">Matches</span></div>
             <div class="stat-pill"><span class="stat-num">${totalEvents}</span><span class="stat-label">Events</span></div>
+            <div class="stat-pill"><span class="stat-num">${totalFotn}</span><span class="stat-label">FOTNs</span></div>
           </div>
           <div class="region-grid">${regionCards}</div>
           <div class="home-section">
             <h2>Recent Matches</h2>
-            <div class="match-list">${renderMatchList(state.matches.slice(-10).reverse())}</div>
+            <div class="match-list">${renderMatchList(recent)}</div>
           </div>
         </div>`;
     }
     
+    // ── Rankings ────────────────────────────────────
     function renderRankings() {
       const region = state.region;
-      let players = region === 'Global' 
-        ? [...state.players] 
+      let players = region === 'Global'
+        ? [...state.players]
         : state.players.filter(p => p.region === region);
       
-      players.sort((a, b) => (b.wins || 0) - (a.wins || 0));
+      // Sort: champions first, then by position number, then by wins
+      players.sort((a, b) => {
+        const aChamp = isChampion(a);
+        const bChamp = isChampion(b);
+        if (aChamp && !bChamp) return -1;
+        if (!aChamp && bChamp) return 1;
+        // Try to sort by position (#1, #2, etc)
+        const aPos = parseInt(a.position) || 999;
+        const bPos = parseInt(b.position) || 999;
+        if (aPos !== bPos) return aPos - bPos;
+        return (b.wins || 0) - (a.wins || 0);
+      });
       
       if (players.length === 0) {
         return `<div class="empty-state"><p>No ranked players in ${region} yet.</p></div>`;
@@ -289,19 +336,19 @@
         const total = wins + losses;
         const winRate = total > 0 ? Math.round(wins / total * 100) : 0;
         const flag = REGION_FLAGS[p.region] || '';
-        const tier = p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : '';
+        const tier = p.tier && p.tier !== 'ranked' && p.tier !== 'unranked' ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : '';
         const aff = p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : '';
-        const avatar = p.avatarUrl 
-          ? `<img src="${p.avatarUrl}" class="player-avatar" alt="${p.name}">`
-          : `<div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`;
+        const champIcon = isChampion(p) ? '👑' : (pos === 1 ? '👑' : '#' + pos);
+        const fotns = getFotnCount(p.name);
+        const fotnBadge = fotns > 0 ? `<span class="fotn-count">🌟 ${fotns}</span>` : '';
         
         return `
-          <div class="ranking-row" onclick="showPlayer('${p.id}')">
-            <div class="rank-pos">${pos === 1 ? '👑' : '#' + pos}</div>
-            ${avatar}
+          <div class="ranking-row" onclick="showPlayerByName('${(p.name || '').replace(/'/g, "\\'")}')">
+            <div class="rank-pos">${champIcon}</div>
+            <div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>
             <div class="rank-info">
               <div class="rank-name">${p.name || 'Unknown'} ${flag}</div>
-              <div class="rank-tags">${tier} ${aff}</div>
+              <div class="rank-tags">${tier} ${aff} ${fotnBadge}</div>
             </div>
             <div class="rank-record">${wins}-${losses}</div>
             <div class="rank-winrate">${winRate}%</div>
@@ -310,14 +357,15 @@
       
       return `
         <div class="page-rankings">
-          <h2>${REGION_FLAGS[region]} ${region} Rankings</h2>
+          <h2>${REGION_FLAGS[region] || ''} ${region} Rankings</h2>
           <div class="ranking-list">${rows}</div>
         </div>`;
     }
     
+    // ── Players ─────────────────────────────────────
     function renderPlayers() {
-      let players = state.region === 'Global' 
-        ? [...state.players] 
+      let players = state.region === 'Global'
+        ? [...state.players]
         : state.players.filter(p => p.region === state.region);
       
       if (state.searchQuery) {
@@ -325,88 +373,118 @@
         players = players.filter(p => p.name?.toLowerCase().includes(q));
       }
       
+      // Deduplicate by name (keep the one with most data)
+      let seen = {};
+      players = players.filter(p => {
+        const key = (p.name || '').toLowerCase();
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+      
       players.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       
       return `
         <div class="page-players">
           <div class="search-bar">
-            <input type="text" placeholder="Search player..." id="playerSearch" 
+            <input type="text" placeholder="Search player..." id="playerSearch"
               value="${state.searchQuery}" oninput="onSearch(this.value)">
           </div>
           <div class="player-grid">
             ${players.map(p => {
               const flag = REGION_FLAGS[p.region] || '';
-              const tier = p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : '';
               const wins = p.wins || 0;
               const losses = p.losses || 0;
-              const avatar = p.avatarUrl 
-                ? `<img src="${p.avatarUrl}" class="player-avatar" alt="${p.name}">`
-                : `<div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`;
+              const fotns = getFotnCount(p.name);
               return `
-                <div class="player-card" onclick="showPlayer('${p.id}')">
-                  ${avatar}
+                <div class="player-card" onclick="showPlayerByName('${(p.name || '').replace(/'/g, "\\'")}')">
+                  <div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>
                   <div class="player-card-name">${p.name || 'Unknown'} ${flag}</div>
-                  <div class="player-card-tags">${tier}</div>
-                  <div class="player-card-record">${wins}W - ${losses}L</div>
+                  <div class="player-card-tags">${p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : ''}</div>
+                  <div class="player-card-record">${wins}W - ${losses}L${fotns > 0 ? ` · 🌟 ${fotns}` : ''}</div>
                 </div>`;
             }).join('') || '<p class="empty-state">No players found.</p>'}
           </div>
         </div>`;
     }
     
+    // ── Events ──────────────────────────────────────
     function renderEvents() {
-      const events = [...state.events].sort((a, b) => 
-        new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)
-      );
+      let events = [...state.events].sort((a, b) => {
+        // Sort by name alphabetically (events don't have real dates)
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      // Group by region if in a specific region
+      const region = state.region;
+      if (region !== 'Global') {
+        events = events.filter(e => !e.region || e.region === region || e.region === 'Global');
+      }
       
       if (events.length === 0) {
         return `<div class="empty-state"><p>No events yet.</p></div>`;
       }
       
-      return `
-        <div class="page-events">
-          <h2>Events</h2>
+      // Group by type (Tournament vs Fight Night vs numbered)
+      let tournaments = events.filter(e => e.isTournament || /tournament/i.test(e.name));
+      let fightNights = events.filter(e => !e.isTournament && /fight night/i.test(e.name));
+      let numbered = events.filter(e => !e.isTournament && !/fight night|tournament/i.test(e.name));
+      
+      function renderEventGroup(title, evts) {
+        if (evts.length === 0) return '';
+        return `<div class="event-group">
+          <h3>${title} (${evts.length})</h3>
           <div class="event-list">
-            ${events.map(e => {
-              const date = e.date ? new Date(e.date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : 'TBD';
-              const status = e.completed ? '<span class="event-status completed">Completed</span>' : '<span class="event-status upcoming">Upcoming</span>';
+            ${evts.map(e => {
               const type = e.isTournament ? '🏆 Tournament' : '🥊 Fight Night';
+              const matchCount = state.matches.filter(m => m.event === e.name).length;
               return `
-                <div class="event-card">
-                  <div class="event-date">${date}</div>
+                <div class="event-card" onclick="showEvent('${(e.name || '').replace(/'/g, "\\'")}')">
                   <div class="event-info">
                     <div class="event-name">${e.name}</div>
-                    <div class="event-type">${type} ${status}</div>
+                    <div class="event-type">${type} · ${matchCount} matches</div>
                   </div>
                 </div>`;
             }).join('')}
           </div>
         </div>`;
+      }
+      
+      return `
+        <div class="page-events">
+          <h2>Events ${region !== 'Global' ? '— ' + region : ''}</h2>
+          ${renderEventGroup('Tournaments', tournaments)}
+          ${renderEventGroup('Fight Nights', fightNights)}
+          ${renderEventGroup('Numbered Events', numbered)}
+        </div>`;
     }
     
+    // ── Stats ───────────────────────────────────────
     function renderStats() {
       const totalPlayers = state.players.length;
       const totalMatches = state.matches.length;
+      const totalFotn = state.matches.filter(m => m.fotn).length;
+      const totalTitles = state.matches.filter(m => m.titleFight).length;
       const regions = ['EU', 'NA', 'SA', 'AS'];
       
       let regionStats = regions.map(r => {
         const players = state.players.filter(p => p.region === r);
-        const matches = state.matches.filter(m => {
-          const player = state.players.find(p => p.id === m.playerId);
-          return player && player.region === r;
-        });
-        const wins = players.reduce((s, p) => s + (p.wins || 0), 0);
-        const losses = players.reduce((s, p) => s + (p.losses || 0), 0);
-        return { region: r, players: players.length, matches: matches.length, wins, losses };
+        const matches = state.matches.filter(m => m.region === r);
+        return { region: r, players: players.length, matches: matches.length };
       });
       
-      let tierDist = {};
-      state.players.forEach(p => {
-        if (p.tier) tierDist[p.tier] = (tierDist[p.tier] || 0) + 1;
+      // Top FOTN winners
+      let fotnPlayers = {};
+      state.matches.filter(m => m.fotn).forEach(m => {
+        const p1 = m.player1 || '';
+        const p2 = m.player2 || '';
+        if (p1) fotnPlayers[p1] = (fotnPlayers[p1] || 0) + 1;
+        if (p2) fotnPlayers[p2] = (fotnPlayers[p2] || 0) + 1;
       });
+      let topFotn = Object.entries(fotnPlayers).sort((a,b) => b[1] - a[1]).slice(0, 5);
       
-      let fotnCount = state.matches.filter(m => m.fotn).length;
-      let forfeitCount = state.matches.filter(m => m.forfeit).length;
+      // Top by wins
+      let topWins = [...state.players].filter(p => (p.wins||0) > 0).sort((a,b) => (b.wins||0) - (a.wins||0)).slice(0, 10);
       
       return `
         <div class="page-stats">
@@ -414,8 +492,8 @@
           <div class="stats-grid">
             <div class="stat-card"><div class="stat-big">${totalPlayers}</div><div class="stat-label">Total Players</div></div>
             <div class="stat-card"><div class="stat-big">${totalMatches}</div><div class="stat-label">Total Matches</div></div>
-            <div class="stat-card"><div class="stat-big">${fotnCount}</div><div class="stat-label">FOTNs</div></div>
-            <div class="stat-card"><div class="stat-big">${forfeitCount}</div><div class="stat-label">Forfeits</div></div>
+            <div class="stat-card"><div class="stat-big">${totalFotn}</div><div class="stat-label">FOTNs</div></div>
+            <div class="stat-card"><div class="stat-big">${totalTitles}</div><div class="stat-label">Title Fights</div></div>
           </div>
           <div class="stats-section">
             <h3>By Region</h3>
@@ -426,44 +504,63 @@
                   <span class="region-name">${rs.region}</span>
                   <span>${rs.players} players</span>
                   <span>${rs.matches} matches</span>
-                  <span>${rs.wins}W / ${rs.losses}L</span>
                 </div>`).join('')}
             </div>
           </div>
-          ${Object.keys(tierDist).length > 0 ? `
-            <div class="stats-section">
-              <h3>Tier Distribution</h3>
-              <div class="tier-dist">
-                ${Object.entries(tierDist).sort().map(([tier, count]) => `
-                  <div class="tier-row">
-                    <span class="tier-badge tier-${tier.toLowerCase()}">${tier}</span>
-                    <div class="tier-bar"><div class="tier-fill" style="width:${(count/totalPlayers*100)}%"></div></div>
-                    <span>${count}</span>
-                  </div>`).join('')}
-              </div>
-            </div>` : ''}
+          <div class="stats-section">
+            <h3>Top 10 by Wins</h3>
+            <div class="ranking-list">
+              ${topWins.map((p, i) => {
+                const wins = p.wins || 0;
+                const losses = p.losses || 0;
+                const wr = wins + losses > 0 ? Math.round(wins/(wins+losses)*100) : 0;
+                return `<div class="ranking-row" onclick="showPlayerByName('${(p.name||'').replace(/'/g, "\\'")}')">
+                  <div class="rank-pos">#${i+1}</div>
+                  <div class="player-avatar placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase()||'?'}</div>
+                  <div class="rank-info"><div class="rank-name">${p.name} ${REGION_FLAGS[p.region]||''}</div><div class="rank-tags">${p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : ''}</div></div>
+                  <div class="rank-record">${wins}-${losses}</div>
+                  <div class="rank-winrate">${wr}%</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          ${topFotn.length > 0 ? `
+          <div class="stats-section">
+            <h3>🌟 Most FOTN Awards</h3>
+            <div class="ranking-list">
+              ${topFotn.map(([name, count], i) => `
+                <div class="ranking-row" onclick="showPlayerByName('${name.replace(/'/g, "\\'")}')">
+                  <div class="rank-pos">#${i+1}</div>
+                  <div class="player-avatar placeholder" style="--accent:${REGION_COLORS[getPlayerRegion(name)]||'#666'}">${name.charAt(0).toUpperCase()}</div>
+                  <div class="rank-info"><div class="rank-name">${name} ${REGION_FLAGS[getPlayerRegion(name)]||''}</div></div>
+                  <div class="rank-record">🌟 ${count}</div>
+                </div>`).join('')}
+            </div>
+          </div>` : ''}
         </div>`;
     }
     
+    // ── Match List (deduplicated format) ────────────
     function renderMatchList(matches) {
       if (!matches || matches.length === 0) return '<p class="empty-state">No matches recorded yet.</p>';
       return matches.map(m => {
-        const player = state.players.find(p => p.id === m.playerId);
-        const resultClass = m.result?.toLowerCase() || 'draw';
-        const fotn = m.fotn ? '<span class="fotn-badge">🎬 FOTN</span>' : '';
-        const forfeit = m.forfeit ? '<span class="forfeit-badge">FF</span>' : '';
+        const p1 = m.player1 || '?';
+        const p2 = m.player2 || '?';
+        const score = m.score || '';
+        const fotn = m.fotn ? '<span class="fotn-badge">🌟 FOTN</span>' : '';
+        const title = m.titleFight ? '<span class="title-badge">🏆 Title</span>' : '';
         const vod = m.vod ? `<a href="${m.vod}" target="_blank" class="vod-link">▶ VOD</a>` : '';
-        const rounds = m.rounds ? ` (${m.rounds})` : '';
+        const notes = m.notes ? `<div class="match-notes">${m.notes}</div>` : '';
         return `
           <div class="match-row">
-            <div class="match-result ${resultClass}">${m.result || '?'}</div>
             <div class="match-players">
-              <span class="match-player" onclick="showPlayer('${m.playerId}')">${player?.name || '?'}</span>
+              <span class="match-player" onclick="showPlayerByName('${p1.replace(/'/g, "\\'")}')">${p1}</span>
               <span class="match-vs">vs</span>
-              <span class="match-opponent">${m.opponent || '?'}</span>
+              <span class="match-opponent" onclick="showPlayerByName('${p2.replace(/'/g, "\\'")}')">${p2}</span>
             </div>
-            <div class="match-score">${m.score || ''}${rounds} ${forfeit} ${fotn}</div>
+            <div class="match-score">${score} ${fotn} ${title}</div>
             <div class="match-event">${m.event || ''}</div>
+            ${notes}
             <div>${vod}</div>
           </div>`;
       }).join('');
@@ -474,28 +571,28 @@
       if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
       return `
         <div class="page-admin">
-          <h2>Manage Players</h2>
+          <h2>Manage Players (${state.players.length})</h2>
           <div class="admin-form" id="playerForm">
             <h3>Add New Player</h3>
             <div class="form-grid">
               <input type="text" id="pName" placeholder="Player name" class="admin-input">
               <select id="pRegion" class="admin-input">
-                <option value="EU">🇪🇺 EU</option>
-                <option value="NA">🇺🇸 NA</option>
-                <option value="SA">🌎 SA</option>
-                <option value="AS">🇰🇷 AS</option>
+                <option value="EU">EU</option>
+                <option value="NA">NA</option>
+                <option value="SA">SA</option>
+                <option value="AS">AS</option>
+                <option value="Global">Global</option>
               </select>
-              <input type="text" id="pTier" placeholder="Tier (S, A, B, C, D, F)" class="admin-input">
               <input type="text" id="pAff" placeholder="Affiliation (optional)" class="admin-input">
               <button class="admin-submit" onclick="addPlayer()">Add Player</button>
             </div>
           </div>
           <div class="admin-list">
-            <h3>Current Players (${state.players.length})</h3>
+            <h3>Current Players</h3>
             <div class="admin-player-list">
-              ${state.players.map(p => `
+              ${state.players.sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(p => `
                 <div class="admin-row">
-                  <span>${p.name} — ${p.region} ${p.tier || ''} ${p.affiliation || ''}</span>
+                  <span>${p.name} — ${p.region} ${p.affiliation ? '· ' + p.affiliation : ''} (${p.wins||0}W-${p.losses||0}L)</span>
                   <button class="admin-delete" onclick="deletePlayer('${p.id}')">Delete</button>
                 </div>`).join('') || '<p>No players yet.</p>'}
             </div>
@@ -505,7 +602,6 @@
     
     function renderAdminMatches() {
       if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
-      const playerOptions = state.players.map(p => `<option value="${p.id}">${p.name} (${p.region})</option>`).join('');
       const eventOptions = state.events.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
       
       return `
@@ -513,23 +609,23 @@
           <h2>Add Match</h2>
           <div class="admin-form">
             <div class="form-grid">
-              <select id="mPlayer" class="admin-input"><option value="">Select player...</option>${playerOptions}</select>
-              <input type="text" id="mOpponent" placeholder="Opponent name" class="admin-input">
-              <select id="mResult" class="admin-input">
-                <option value="Win">Win</option>
-                <option value="Loss">Loss</option>
-                <option value="Draw">Draw</option>
-                <option value="NC">NC</option>
+              <input type="text" id="mP1" placeholder="Player 1 (winner)" class="admin-input">
+              <input type="text" id="mP2" placeholder="Player 2 (opponent)" class="admin-input">
+              <input type="text" id="mScore" placeholder="Score (e.g. 9102-6853)" class="admin-input">
+              <select id="mRegion" class="admin-input">
+                <option value="EU">EU</option>
+                <option value="NA">NA</option>
+                <option value="SA">SA</option>
+                <option value="AS">AS</option>
+                <option value="Global">Global</option>
               </select>
-              <input type="text" id="mScore" placeholder="Score (e.g. 3-2)" class="admin-input">
-              <input type="text" id="mRounds" placeholder="Rounds (e.g. 2-1)" class="admin-input">
               <select id="mEvent" class="admin-input"><option value="">Select event...</option>${eventOptions}</select>
               <input type="text" id="mVod" placeholder="VOD URL (optional)" class="admin-input">
-              <div class="form-checks">
-                <label><input type="checkbox" id="mFotn"> 🎬 Fight of the Night</label>
-                <label><input type="checkbox" id="mForfeit"> Forfeit</label>
-              </div>
               <input type="text" id="mNotes" placeholder="Notes (optional)" class="admin-input">
+              <div class="form-checks">
+                <label><input type="checkbox" id="mFotn"> 🌟 Fight of the Night</label>
+                <label><input type="checkbox" id="mTitle"> 🏆 Title Fight</label>
+              </div>
               <button class="admin-submit" onclick="addMatch()">Add Match</button>
             </div>
           </div>
@@ -540,22 +636,28 @@
       if (!state.isAdmin) return '<div class="error-state"><p>Admin access required.</p></div>';
       return `
         <div class="page-admin">
-          <h2>Manage Events</h2>
+          <h2>Manage Events (${state.events.length})</h2>
           <div class="admin-form">
             <h3>Add Event</h3>
             <div class="form-grid">
-              <input type="text" id="eName" placeholder="Event name (e.g. Fight Night #16)" class="admin-input">
-              <input type="date" id="eDate" class="admin-input">
+              <input type="text" id="eName" placeholder="Event name (e.g. Fight Night #31)" class="admin-input">
+              <select id="eRegion" class="admin-input">
+                <option value="Global">Global</option>
+                <option value="EU">EU</option>
+                <option value="NA">NA</option>
+                <option value="SA">SA</option>
+                <option value="AS">AS</option>
+              </select>
               <label><input type="checkbox" id="eTournament"> 🏆 Tournament</label>
               <button class="admin-submit" onclick="addEvent()">Add Event</button>
             </div>
           </div>
           <div class="admin-list">
-            <h3>Events (${state.events.length})</h3>
+            <h3>Events</h3>
             <div class="admin-event-list">
-              ${state.events.sort((a,b) => new Date(b.date||0) - new Date(a.date||0)).map(e => `
+              ${state.events.sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(e => `
                 <div class="admin-row">
-                  <span>${e.name} — ${e.date ? new Date(e.date).toLocaleDateString() : 'TBD'} ${e.isTournament ? '🏆' : ''}</span>
+                  <span>${e.name} — ${e.region || 'Global'} ${e.isTournament ? '🏆' : '🥊'}</span>
                   <button class="admin-delete" onclick="deleteEvent('${e.id}')">Delete</button>
                 </div>`).join('') || '<p>No events yet.</p>'}
             </div>
@@ -567,79 +669,62 @@
     window.addPlayer = async function() {
       const name = document.getElementById('pName').value.trim();
       const region = document.getElementById('pRegion').value;
-      const tier = document.getElementById('pTier').value.trim();
       const aff = document.getElementById('pAff').value.trim();
       if (!name) return alert('Name required');
       
       await addDoc(collection(db, 'players'), {
-        name, region, tier: tier || null, affiliation: aff || null,
-        wins: 0, losses: 0, createdAt: Date.now()
+        name, region, affiliation: aff || null,
+        wins: 0, losses: 0, position: 'unranked', tier: 'unranked',
+        createdAt: Date.now()
       });
       
       document.getElementById('pName').value = '';
-      document.getElementById('pTier').value = '';
       document.getElementById('pAff').value = '';
       await loadData();
     };
     
     window.deletePlayer = async function(id) {
-      if (!confirm('Delete this player? This will NOT delete their matches.')) return;
+      if (!confirm('Delete this player?')) return;
       await deleteDoc(doc(db, 'players', id));
       await loadData();
     };
     
     window.addMatch = async function() {
-      const playerId = document.getElementById('mPlayer').value;
-      const opponent = document.getElementById('mOpponent').value.trim();
-      const result = document.getElementById('mResult').value;
+      const player1 = document.getElementById('mP1').value.trim();
+      const player2 = document.getElementById('mP2').value.trim();
       const score = document.getElementById('mScore').value.trim();
-      const rounds = document.getElementById('mRounds').value.trim();
+      const region = document.getElementById('mRegion').value;
       const event = document.getElementById('mEvent').value;
       const vod = document.getElementById('mVod').value.trim();
-      const fotn = document.getElementById('mFotn').checked;
-      const forfeit = document.getElementById('mForfeit').checked;
       const notes = document.getElementById('mNotes').value.trim();
+      const fotn = document.getElementById('mFotn').checked;
+      const titleFight = document.getElementById('mTitle').checked;
       
-      if (!playerId || !opponent) return alert('Player and opponent required');
+      if (!player1 || !player2) return alert('Both players required');
       
       await addDoc(collection(db, 'matches'), {
-        playerId, opponent, result, score, rounds, event, vod, fotn, forfeit, notes,
-        createdAt: Date.now()
+        player1, player2, score, region, event, vod, notes,
+        fotn, titleFight, createdAt: Date.now()
       });
       
-      // Update player W/L
-      const player = state.players.find(p => p.id === playerId);
-      if (player) {
-        const updates = {};
-        if (result === 'Win') updates.wins = (player.wins || 0) + 1;
-        else if (result === 'Loss') updates.losses = (player.losses || 0) + 1;
-        await updateDoc(doc(db, 'players', playerId), updates);
-      }
-      
-      await loadData();
       // Clear form
-      document.getElementById('mOpponent').value = '';
-      document.getElementById('mScore').value = '';
-      document.getElementById('mRounds').value = '';
-      document.getElementById('mVod').value = '';
-      document.getElementById('mNotes').value = '';
+      ['mP1','mP2','mScore','mVod','mNotes'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('mFotn').checked = false;
-      document.getElementById('mForfeit').checked = false;
+      document.getElementById('mTitle').checked = false;
+      await loadData();
     };
     
     window.addEvent = async function() {
       const name = document.getElementById('eName').value.trim();
-      const date = document.getElementById('eDate').value;
+      const region = document.getElementById('eRegion').value;
       const isTournament = document.getElementById('eTournament').checked;
       if (!name) return alert('Event name required');
       
       await addDoc(collection(db, 'events'), {
-        name, date: date ? new Date(date).toISOString() : null,
-        isTournament, completed: false, createdAt: Date.now()
+        name, region, isTournament, completed: false, createdAt: Date.now()
       });
       
       document.getElementById('eName').value = '';
-      document.getElementById('eDate').value = '';
       document.getElementById('eTournament').checked = false;
       await loadData();
     };
@@ -650,15 +735,19 @@
       await loadData();
     };
     
-    window.showPlayer = function(id) {
-      const p = state.players.find(x => x.id === id);
+    // ── Player Modal (by name) ──────────────────────
+    window.showPlayerByName = function(name) {
+      // Find player by name (case insensitive)
+      const p = state.playerByName[name.toLowerCase()];
       if (!p) return;
-      const matches = state.matches.filter(m => m.playerId === id);
+      
+      const matches = getMatchesForPlayer(name);
       const wins = p.wins || 0;
       const losses = p.losses || 0;
       const total = wins + losses;
       const winRate = total > 0 ? Math.round(wins / total * 100) : 0;
       const fotns = matches.filter(m => m.fotn).length;
+      const titles = matches.filter(m => m.titleFight).length;
       
       const modal = document.createElement('div');
       modal.className = 'modal-overlay';
@@ -667,12 +756,11 @@
         <div class="modal-content" onclick="event.stopPropagation()">
           <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
           <div class="player-modal-header" style="--accent:${REGION_COLORS[p.region]||'#666'}">
-            ${p.avatarUrl 
-              ? `<img src="${p.avatarUrl}" class="player-avatar large" alt="${p.name}">`
-              : `<div class="player-avatar large placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>`}
+            <div class="player-avatar large placeholder" style="--accent:${REGION_COLORS[p.region]||'#666'}">${p.name?.charAt(0)?.toUpperCase() || '?'}</div>
             <h2>${p.name} ${REGION_FLAGS[p.region]||''}</h2>
             <div class="player-modal-tags">
-              ${p.tier ? `<span class="tier-badge tier-${p.tier.toLowerCase()}">${p.tier}</span>` : ''}
+              ${isChampion(p) ? '<span class="tier-badge tier-s">👑 Champion</span>' : ''}
+              ${p.position && p.position !== 'unranked' ? `<span class="position-badge">${p.position}</span>` : ''}
               ${p.affiliation ? `<span class="aff-tag">${p.affiliation}</span>` : ''}
             </div>
           </div>
@@ -681,10 +769,43 @@
             <div class="modal-stat"><span class="modal-stat-num">${winRate}%</span><span class="modal-stat-label">Win Rate</span></div>
             <div class="modal-stat"><span class="modal-stat-num">${total}</span><span class="modal-stat-label">Matches</span></div>
             <div class="modal-stat"><span class="modal-stat-num">${fotns}</span><span class="modal-stat-label">FOTNs</span></div>
+            <div class="modal-stat"><span class="modal-stat-num">${titles}</span><span class="modal-stat-label">Title Fights</span></div>
           </div>
           <div class="player-modal-history">
-            <h3>Match History</h3>
-            ${matches.length > 0 ? `<div class="match-list">${renderMatchList(matches.reverse())}</div>` : '<p>No matches recorded.</p>'}
+            <h3>Match History (${matches.length})</h3>
+            ${matches.length > 0 ? `<div class="match-list">${renderMatchList(matches.sort((a,b) => (b.createdAt||0) - (a.createdAt||0)))}</div>` : '<p>No matches recorded.</p>'}
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    };
+    
+    // Keep old showPlayer for backwards compat
+    window.showPlayer = function(id) {
+      const p = state.players.find(x => x.id === id);
+      if (p) showPlayerByName(p.name);
+    };
+    
+    // ── Event Modal ─────────────────────────────────
+    window.showEvent = function(eventName) {
+      const matches = state.matches.filter(m => m.event === eventName);
+      const e = state.events.find(x => x.name === eventName);
+      
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.onclick = () => modal.remove();
+      modal.innerHTML = `
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <div class="player-modal-header">
+            <h2>${eventName}</h2>
+            <div class="player-modal-tags">
+              ${e?.isTournament ? '<span class="tier-badge tier-s">🏆 Tournament</span>' : '<span class="tier-badge tier-a">🥊 Fight Night</span>'}
+              <span class="position-badge">${matches.length} matches</span>
+            </div>
+          </div>
+          <div class="player-modal-history">
+            <h3>Matches</h3>
+            ${matches.length > 0 ? `<div class="match-list">${renderMatchList(matches)}</div>` : '<p>No matches recorded for this event.</p>'}
           </div>
         </div>`;
       document.body.appendChild(modal);
@@ -693,23 +814,17 @@
     window.onSearch = function(val) {
       state.searchQuery = val;
       render();
-      // Refocus
       const input = document.getElementById('playerSearch');
       if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
     };
     
     function attachHandlers() {
-      // Close admin menu on outside click
       document.addEventListener('click', (e) => {
         if (!e.target.closest('#adminBtn') && !e.target.closest('#adminMenu')) {
           document.getElementById('adminMenu')?.classList.add('hidden');
         }
       });
     }
-    
-    // ── Constants ───────────────────────────────────
-    const REGION_FLAGS = { EU:'EU', NA:'NA', SA:'SA', AS:'AS', Global:'ALL' };
-    const REGION_COLORS = { EU:'#c0c0c0', NA:'#808080', SA:'#a0a0a0', AS:'#909090', Global:'#f7f5f6' };
     
     // ── Init ────────────────────────────────────────
     loadData();
