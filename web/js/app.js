@@ -101,11 +101,35 @@ async function loadData() {
       getDocs(collection(db, 'matches')),
       getDocs(collection(db, 'events'))
     ]);
-    state.players = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    state.matches = mSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    state.events = eSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Filter to v2_ docs only (new migration), deduplicate by name
+    state.players = pSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.id && p.id.startsWith('v2_'));
+    // Deduplicate players by name (keep last)
     state.playerByName = {};
     state.players.forEach(p => { if (p.name) state.playerByName[p.name.toLowerCase()] = p; });
+    state.players = Object.values(state.playerByName);
+    
+    // Matches: filter v2_ and deduplicate by player pair + score + event
+    const rawMatches = mSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(m => m.id && m.id.startsWith('v2_'));
+    const matchSeen = new Set();
+    state.matches = rawMatches.filter(m => {
+      const p1 = (m.player1 || '').toLowerCase();
+      const p2 = (m.player2 || '').toLowerCase();
+      const pair = [p1, p2].sort().join('|');
+      const score = m.score || '';
+      const event = m.event || '';
+      const key = pair + '|' + score + '|' + event;
+      if (matchSeen.has(key)) return false;
+      matchSeen.add(key);
+      return true;
+    });
+    
+    state.events = eSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(e => e.id && e.id.startsWith('v2_'));
     console.log(`Loaded: ${state.players.length} players, ${state.matches.length} matches, ${state.events.length} events`);
     render();
   } catch (e) {
