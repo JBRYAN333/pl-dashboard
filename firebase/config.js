@@ -1,12 +1,11 @@
 // Firebase config — PL Dashboard
-// Cole aqui as config do teu projeto Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "pl-dashboard-XXXXX.firebaseapp.com",
-  projectId: "pl-dashboard-XXXXX",
-  storageBucket: "pl-dashboard-XXXXX.appspot.com",
-  messagingSenderId: "XXXXXXXXXXXXX",
-  appId: "1:XXXXXXXXXXXXX:web:XXXXXXXXXXXXXXXXXXX"
+  apiKey: "AIzaSyDvDk5aoU-UDidEnn5HowUyRQLdatTQ-nI",
+  authDomain: "pl-dashboard-f7315.firebaseapp.com",
+  projectId: "pl-dashboard-f7315",
+  storageBucket: "pl-dashboard-f7315.firebasestorage.app",
+  messagingSenderId: "98422610300",
+  appId: "1:98422610300:web:a138666f2218634d152cf9"
 };
 
 // Exportar para uso no browser
