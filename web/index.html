@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
   <title>PL Record Book — DW2 Pro League</title>
   <meta name="description" content="DW2 Pro League Record Book — Rankings, player stats, match history and tournament records.">
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" href="assets/pl-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
     <header class="header">
       <div class="header-inner">
         <div class="logo" onclick="navigate('home')">
-          <span class="logo-icon">🏆</span>
+          <img src="assets/pl-logo.png" class="logo-img" alt="PL">
           <span class="logo-text">PL<span class="logo-accent">RECORD</span>BOOK</span>
         </div>
         <nav class="nav">
@@ -29,11 +29,11 @@
         </nav>
         <div class="header-right">
           <div class="region-selector" id="regionSelector">
-            <button class="region-btn active" data-region="Global" onclick="setRegion('Global')">🌍 Global</button>
-            <button class="region-btn" data-region="EU" onclick="setRegion('EU')">🇪🇺 EU</button>
-            <button class="region-btn" data-region="NA" onclick="setRegion('NA')">🇺🇸 NA</button>
-            <button class="region-btn" data-region="SA" onclick="setRegion('SA')">🌎 SA</button>
-            <button class="region-btn" data-region="AS" onclick="setRegion('AS')">🇰🇷 AS</button>
+            <button class="region-btn active" data-region="Global" onclick="setRegion('Global')">ALL</button>
+            <button class="region-btn" data-region="EU" onclick="setRegion('EU')">EU</button>
+            <button class="region-btn" data-region="NA" onclick="setRegion('NA')">NA</button>
+            <button class="region-btn" data-region="SA" onclick="setRegion('SA')">SA</button>
+            <button class="region-btn" data-region="AS" onclick="setRegion('AS')">AS</button>
           </div>
           <button class="admin-btn" id="adminBtn" onclick="toggleAdmin()">⚙️ Admin</button>
           <div class="admin-menu hidden" id="adminMenu">
@@ -702,8 +702,8 @@
     }
     
     // ── Constants ───────────────────────────────────
-    const REGION_FLAGS = { EU:'🇪🇺', NA:'🇺🇸', SA:'🌎', AS:'🇰🇷', Global:'🌍' };
-    const REGION_COLORS = { EU:'#003BB5', NA:'#BF0000', SA:'#009C3B', AS:'#FF6600', Global:'#00BFFF' };
+    const REGION_FLAGS = { EU:'EU', NA:'NA', SA:'SA', AS:'AS', Global:'ALL' };
+    const REGION_COLORS = { EU:'#c0c0c0', NA:'#808080', SA:'#a0a0a0', AS:'#909090', Global:'#f7f5f6' };
     
     // ── Init ────────────────────────────────────────
     loadData();

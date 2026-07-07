@@ -4,24 +4,27 @@
    ═══════════════════════════════════════════════ */
 
 :root {
-  --bg: #0a0e1a;
-  --bg-card: #121826;
-  --bg-card-hover: #1a2133;
-  --bg-input: #0d1320;
-  --border: #1e2a42;
-  --border-hover: #2a3a5c;
-  --text: #e8ecf4;
-  --text-dim: #8a96b0;
-  --text-faint: #5a6478;
-  --accent: #00BFFF;
-  --accent-dim: #0099cc;
-  --win: #00ff88;
-  --loss: #ff3366;
-  --draw: #ffaa00;
-  --nc: #666;
+  /* PL identity: black, white, silver — no color accents */
+  --bg: #0a0a0a;
+  --bg-card: #121212;
+  --bg-card-hover: #1a1a1a;
+  --bg-input: #0d0d0d;
+  --border: #1e1e1e;
+  --border-hover: #2a2a2a;
+  --text: #f7f5f6;
+  --text-dim: #999999;
+  --text-faint: #555555;
+  --accent: #ffffff;
+  --accent-dim: #cccccc;
+  --silver: #c0c0c0;
+  --silver-dim: #808080;
+  --win: #ffffff;
+  --loss: #888888;
+  --draw: #c0c0c0;
+  --nc: #555555;
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 4px 20px rgba(0,0,0,0.3);
+  --shadow: 0 4px 20px rgba(0,0,0,0.5);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -68,7 +71,8 @@ body {
 }
 
 .logo-icon { font-size: 24px; }
-.logo-accent { color: var(--accent); }
+.logo-img { width: 32px; height: 32px; border-radius: 6px; }
+.logo-accent { color: var(--silver); }
 .logo-text { color: var(--text); }
 
 .nav {
@@ -89,7 +93,7 @@ body {
 }
 
 .nav-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-.nav-btn.active { color: var(--accent); background: rgba(0,191,255,0.1); }
+.nav-btn.active { color: var(--text); background: rgba(255,255,255,0.08); border-bottom: 2px solid var(--silver); }
 
 .header-right {
   margin-left: auto;
@@ -119,7 +123,7 @@ body {
 }
 
 .region-btn:hover { color: var(--text); }
-.region-btn.active { background: var(--accent); color: var(--bg); font-weight: 700; }
+.region-btn.active { background: var(--text); color: var(--bg); font-weight: 700; }
 
 .admin-btn {
   background: var(--bg-card);
@@ -133,8 +137,8 @@ body {
   transition: all 0.2s;
 }
 
-.admin-btn:hover { border-color: var(--accent); color: var(--accent); }
-.admin-btn.admin-active { border-color: var(--win); color: var(--win); }
+.admin-btn:hover { border-color: var(--silver); color: var(--text); }
+.admin-btn.admin-active { border-color: var(--silver); color: var(--silver); }
 
 .admin-menu {
   position: absolute;
@@ -164,11 +168,11 @@ body {
   transition: border 0.2s;
 }
 
-.admin-input:focus { border-color: var(--accent); }
+.admin-input:focus { border-color: var(--silver-dim); }
 
 .admin-login-btn {
   width: 100%;
-  background: var(--accent);
+  background: var(--text);
   color: var(--bg);
   border: none;
   padding: 8px;
@@ -234,11 +238,9 @@ body {
 .hero h1 {
   font-size: clamp(32px, 6vw, 56px);
   font-weight: 900;
-  letter-spacing: 2px;
-  background: linear-gradient(135deg, var(--accent) 0%, #66f0ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: 4px;
+  color: var(--text);
+  text-transform: uppercase;
 }
 
 .hero-sub {
@@ -270,7 +272,7 @@ body {
 .stat-num {
   font-size: 32px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .stat-label {
@@ -307,13 +309,13 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--accent);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--silver), transparent);
 }
 
 .region-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--accent);
+  border-color: var(--silver-dim);
   transform: translateY(-2px);
 }
 
@@ -378,8 +380,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
-  color: var(--bg);
+  background: #1a1a1a;
+  border: 1px solid var(--border);
+  color: var(--text);
   font-weight: 700;
   font-size: 18px;
 }
@@ -418,12 +421,12 @@ body {
   text-transform: uppercase;
 }
 
-.tier-s { background: #00bfff; color: #000; }
-.tier-a { background: #ffd700; color: #000; }
-.tier-b { background: #aaa; color: #000; }
-.tier-c { background: #ff8800; color: #000; }
-.tier-d { background: #00ff00; color: #000; }
-.tier-f { background: #ff3333; color: #fff; }
+.tier-s { background: #f7f5f6; color: #0a0a0a; }
+.tier-a { background: #d0d0d0; color: #0a0a0a; }
+.tier-b { background: #a0a0a0; color: #0a0a0a; }
+.tier-c { background: #707070; color: #f7f5f6; }
+.tier-d { background: #404040; color: #f7f5f6; }
+.tier-f { background: #1a1a1a; color: #888; border: 1px solid #333; }
 
 .aff-tag {
   background: rgba(255,255,255,0.08);
@@ -450,7 +453,7 @@ body {
   transition: border 0.2s;
 }
 
-.search-bar input:focus { border-color: var(--accent); }
+.search-bar input:focus { border-color: var(--silver-dim); }
 
 .player-grid {
   display: grid;
@@ -470,7 +473,7 @@ body {
 
 .player-card:hover {
   background: var(--bg-card-hover);
-  border-color: var(--accent);
+  border-color: var(--silver-dim);
   transform: translateY(-2px);
 }
 
@@ -520,10 +523,10 @@ body {
   text-align: center;
 }
 
-.match-result.win { background: rgba(0,255,136,0.15); color: var(--win); }
-.match-result.loss { background: rgba(255,51,102,0.15); color: var(--loss); }
-.match-result.draw { background: rgba(255,170,0,0.15); color: var(--draw); }
-.match-result.nc { background: rgba(102,102,102,0.15); color: var(--nc); }
+.match-result.win { background: rgba(255,255,255,0.1); color: var(--text); font-weight: 700; }
+.match-result.loss { background: rgba(255,255,255,0.03); color: var(--text-dim); }
+.match-result.draw { background: rgba(192,192,192,0.1); color: var(--silver); }
+.match-result.nc { background: rgba(85,85,85,0.15); color: var(--nc); }
 
 .match-players { flex: 1; display: flex; align-items: center; gap: 6px; }
 .match-player { font-weight: 600; cursor: pointer; }
@@ -535,16 +538,18 @@ body {
 .match-event { color: var(--text-faint); font-size: 12px; }
 
 .vod-link {
-  color: var(--accent);
+  color: var(--silver);
   text-decoration: none;
   font-size: 12px;
   font-weight: 600;
+  border-bottom: 1px solid var(--silver-dim);
 }
 .vod-link:hover { text-decoration: underline; }
 
 .fotn-badge {
-  background: rgba(255,170,0,0.15);
-  color: var(--draw);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--silver-dim);
+  color: var(--silver);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -552,8 +557,8 @@ body {
 }
 
 .forfeit-badge {
-  background: rgba(255,51,102,0.15);
-  color: var(--loss);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-faint);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -597,8 +602,8 @@ body {
   font-weight: 600;
 }
 
-.event-status.completed { background: rgba(0,255,136,0.15); color: var(--win); }
-.event-status.upcoming { background: rgba(0,191,255,0.15); color: var(--accent); }
+.event-status.completed { background: rgba(255,255,255,0.08); color: var(--text-dim); }
+.event-status.upcoming { background: rgba(255,255,255,0.03); color: var(--silver); border: 1px solid var(--silver-dim); }
 
 /* ── Stats Page ────────────────────────────────── */
 .stats-grid {
@@ -619,7 +624,7 @@ body {
 .stat-big {
   font-size: 36px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .stats-section {
@@ -671,7 +676,7 @@ body {
 
 .tier-fill {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, #333, var(--silver));
   transition: width 0.5s;
 }
 
@@ -715,7 +720,7 @@ body {
 }
 
 .admin-submit {
-  background: var(--accent);
+  background: var(--text);
   color: var(--bg);
   border: none;
   padding: 10px 20px;
@@ -726,7 +731,7 @@ body {
   transition: all 0.2s;
 }
 
-.admin-submit:hover { background: var(--accent-dim); }
+.admin-submit:hover { background: var(--silver); }
 
 .admin-list {
   background: var(--bg-card);
@@ -753,9 +758,9 @@ body {
 .admin-row:hover { background: rgba(255,255,255,0.03); }
 
 .admin-delete {
-  background: rgba(255,51,102,0.1);
-  border: 1px solid rgba(255,51,102,0.2);
-  color: var(--loss);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-hover);
+  color: var(--text-dim);
   padding: 4px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -763,7 +768,7 @@ body {
   font-weight: 600;
 }
 
-.admin-delete:hover { background: rgba(255,51,102,0.2); }
+.admin-delete:hover { background: rgba(255,255,255,0.08); color: var(--text); }
 
 /* ── Modal ─────────────────────────────────────── */
 .modal-overlay {
@@ -855,7 +860,7 @@ body {
   display: block;
   font-size: 22px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .modal-stat-label {
