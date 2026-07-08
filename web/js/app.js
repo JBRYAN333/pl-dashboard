@@ -55,7 +55,7 @@ function getMatchesForPlayer(name) {
   return state.matches.filter(m =>
     (m.player1 && m.player1.toLowerCase() === ln) ||
     (m.player2 && m.player2.toLowerCase() === ln)
-  );
+  ).filter(m => isValidPlayerName(m.player1) && isValidPlayerName(m.player2));
 }
 
 function getFotnCount(name) {
@@ -93,6 +93,27 @@ function esc(s) {
   return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
+function isValidPlayerName(name) {
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 2 || trimmed.length > 40) return false;
+  if (/^\d/.test(trimmed)) return false;
+  if (/^\d[\d:.\- ]+$/.test(trimmed)) return false;
+  if (/^(the|a|an|of|in|on|at|to|for|is|was|2|4|half|parts?|score|added|round|bout|fight|non-|\()/i.test(trimmed)) return false;
+  if (/blockspamming|last \d+ seconds|added from/i.test(trimmed)) return false;
+  if (/^(tier|unranked|champion|vacant|n\/a|unknown|inactive|qualifier|non-tournament)$/i.test(trimmed)) return false;
+  return true;
+}
+
+function isValidEventName(name) {
+  if (!name || typeof name !== 'string') return false;
+  const t = name.trim();
+  if (t.length < 3) return false;
+  if (/^(eu|na|sa|as|global|the|april|february|december)$/i.test(t)) return false;
+  if (/^\(/.test(t) && /\)$/.test(t)) return false;
+  return /dw2pl/i.test(t) || /tournament/i.test(t) || /fight\s*night/i.test(t) || /^\d/.test(t);
+}
+
 // ── Data Loading ────────────────────────────────
 async function loadData() {
   try {
@@ -101,23 +122,28 @@ async function loadData() {
       getDocs(collection(db, 'matches')),
       getDocs(collection(db, 'events'))
     ]);
-    // Filter to v2_ docs only (new migration), deduplicate by name
-    state.players = pSnap.docs
+    // Load ALL players (both pl_ and v2_), filter garbage, deduplicate
+    const allPlayers = pSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(p => p.id && p.id.startsWith('v2_'));
-    // Deduplicate players by name (keep last)
+      .filter(p => p.name && isValidPlayerName(p.name));
+    // Deduplicate by name (prefer longer/more complete name)
     state.playerByName = {};
-    state.players.forEach(p => { if (p.name) state.playerByName[p.name.toLowerCase()] = p; });
+    allPlayers.forEach(p => {
+      const key = (p.name || '').toLowerCase().trim();
+      const existing = state.playerByName[key];
+      if (!existing || (p.name.length > existing.name.length) || (p.id.startsWith('pl_') && existing.id.startsWith('v2_'))) {
+        state.playerByName[key] = p;
+      }
+    });
     state.players = Object.values(state.playerByName);
     
-    // Matches: filter v2_ and deduplicate by player pair + score + event
-    const rawMatches = mSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(m => m.id && m.id.startsWith('v2_'));
+    // Matches: load all, deduplicate
+    const rawMatches = mSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const matchSeen = new Set();
     state.matches = rawMatches.filter(m => {
       const p1 = (m.player1 || '').toLowerCase();
       const p2 = (m.player2 || '').toLowerCase();
+      if (!p1 || !p2) return false;
       const pair = [p1, p2].sort().join('|');
       const score = m.score || '';
       const event = m.event || '';
@@ -127,9 +153,17 @@ async function loadData() {
       return true;
     });
     
+    // Events: load all, filter garbage, deduplicate
+    const eventSeen = new Set();
     state.events = eSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(e => e.id && e.id.startsWith('v2_'));
+      .filter(e => e.name && isValidEventName(e.name) && !/[A-Za-z]+ [A-Za-z]+ (Tournament|Fight) #[0-9]+ [A-Za-z]+/.test(e.name))
+      .filter(e => {
+        const key = e.name.toLowerCase().trim();
+        if (eventSeen.has(key)) return false;
+        eventSeen.add(key);
+        return true;
+      });
     console.log(`Loaded: ${state.players.length} players, ${state.matches.length} matches, ${state.events.length} events`);
     render();
   } catch (e) {
@@ -315,8 +349,10 @@ function renderHome() {
     </div>`;
   }).join('');
 
-  // Recent matches
-  const recent = [...state.matches].sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).slice(0, 12);
+  // Recent matches (filter bad ones with player names that look like notes)
+  const recent = [...state.matches]
+    .filter(m => isValidPlayerName(m.player1) && isValidPlayerName(m.player2))
+    .sort((a,b) => (b.createdAt||0) - (a.createdAt||0)).slice(0, 12);
 
   return `<div class="page-home">
     <div class="hero"><h1>PL RECORD BOOK</h1>
