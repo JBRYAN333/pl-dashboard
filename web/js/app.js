@@ -141,9 +141,10 @@ async function loadData() {
     const rawMatches = mSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const matchSeen = new Set();
     state.matches = rawMatches.filter(m => {
-      const p1 = (m.player1 || '').toLowerCase();
-      const p2 = (m.player2 || '').toLowerCase();
-      if (!p1 || !p2) return false;
+      if (!m.player1 || !m.player2) return false;
+      if (!isValidPlayerName(m.player1) || !isValidPlayerName(m.player2)) return false;
+      const p1 = m.player1.toLowerCase();
+      const p2 = m.player2.toLowerCase();
       const pair = [p1, p2].sort().join('|');
       const score = m.score || '';
       const event = m.event || '';
@@ -668,17 +669,20 @@ function renderMatchList(matches) {
     const fotn = m.fotn ? '<span class="fotn-badge">🌟 FOTN</span>' : '';
     const title = m.titleFight ? '<span class="title-badge">🏆 Title</span>' : '';
     const vod = m.vod ? `<a href="${m.vod}" target="_blank" class="vod-link">▶ Watch</a>` : '';
-    const notes = m.notes ? `<div class="match-notes">${m.notes}</div>` : '';
+    const notes = m.notes ? m.notes : '';
     const rounds = m.rounds ? `<span class="rounds-badge">⚔ ${m.rounds}</span>` : '';
+    const secondary = (notes || vod) ? `<div class="match-secondary">${notes ? `<span class="match-notes">${notes}</span>` : ''}${vod ? `<span class="match-vod">${vod}</span>` : ''}</div>` : '';
     return `<div class="match-row">
-      <div class="match-players">
-        <span class="match-player" onclick="showPlayerByName('${esc(p1)}')">${p1}</span>
-        <span class="match-vs">vs</span>
-        <span class="match-opponent" onclick="showPlayerByName('${esc(p2)}')">${p2}</span>
+      <div class="match-primary">
+        <div class="match-players">
+          <span class="match-player" onclick="showPlayerByName('${esc(p1)}')">${p1}</span>
+          <span class="match-vs">vs</span>
+          <span class="match-opponent" onclick="showPlayerByName('${esc(p2)}')">${p2}</span>
+        </div>
+        <div class="match-score">${m.score || ''} ${rounds} ${fotn} ${title}</div>
+        <div class="match-event">${m.event || ''}</div>
       </div>
-      <div class="match-score">${m.score || ''} ${rounds} ${fotn} ${title}</div>
-      <div class="match-event">${m.event || ''}</div>
-      ${notes}<div>${vod}</div>
+      ${secondary}
     </div>`;
   }).join('');
 }
