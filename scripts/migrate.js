@@ -109,6 +109,13 @@ async function migrate() {
             createdAt: Date.now()
           };
         }
+        // Records-only players must have region data for site filtering
+        if (!playerMap[name].regions[region]) {
+          playerMap[name].regions[region] = {
+            pos: 'unranked', wins: 0, losses: 0, mp: 0,
+            aff: playerMap[name].affiliation || ''
+          };
+        }
         for (const m of matches) {
           const eventName = (m.event || '').trim();
           if (eventName) eventSet.add(eventName);
@@ -122,18 +129,13 @@ async function migrate() {
           const isWin = result === 'win' || result === 'w';
           const isLoss = result === 'loss' || result === 'l';
 
-          const p1 = name;
-          const p2 = opponent || 'Unknown';
-          const matchKey = [p1, p2].sort().join('|') + '|' + (record || score) + '|' + eventName;
-          const matchId = PREFIX + 'mf_' + shortHash(matchKey);
-
           // Recalculate score from record if score is empty
           if (!score && record) score = record;
 
           matchList.push({
-            id: matchId,
-            player1: p1,
-            player2: p2,
+            id: '',
+            player1: name,
+            player2: opponent || 'Unknown',
             score,
             rounds: '',
             region,
@@ -176,11 +178,33 @@ async function migrate() {
   }
   if (fixedOpponents) console.log(`Fixed ${fixedOpponents} multi-word opponent names`);
 
+  // ── Normalize match direction + score for dedup ──
+  function normScore(s) {
+    if (!s || !s.includes('-')) return s || '';
+    const parts = s.split('-');
+    const a = parseInt(parts[0]), b = parseInt(parts[1]);
+    if (!isNaN(a) && !isNaN(b)) return Math.max(a, b) + '-' + Math.min(a, b);
+    return s;
+  }
+  for (const m of matchList) {
+    const cmp = (m.player1 || '').toLowerCase().localeCompare((m.player2 || '').toLowerCase());
+    if (cmp > 0) {
+      [m.player1, m.player2] = [m.player2, m.player1];
+      m.score = normScore(m.score);
+    } else if (cmp === 0) {
+      // Same player on both sides — skip (shouldn't happen)
+      continue;
+    }
+    // Compute normalized ID
+    const key = m.player1 + '|' + m.player2 + '|' + normScore(m.score) + '|' + (m.event || '');
+    m.id = PREFIX + 'mf_' + shortHash(key);
+  }
+
   // ── Deduplicate players ──
   const players = Object.values(playerMap);
   console.log(`Players: ${players.length}`);
 
-  // ── Deduplicate matches ──
+  // ── Deduplicate matches (by normalized ID) ──
   const matchSeen = new Set();
   const matches = matchList.filter(m => {
     const key = m.id;
