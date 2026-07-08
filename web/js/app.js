@@ -97,9 +97,9 @@ function isValidPlayerName(name) {
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (trimmed.length < 2 || trimmed.length > 40) return false;
-  if (/^\d/.test(trimmed)) return false;
+  if (/^\d+$/.test(trimmed)) return false;
   if (/^\d[\d:.\- ]+$/.test(trimmed)) return false;
-  if (/^(the|a|an|of|in|on|at|to|for|is|was|2|4|half|parts?|score|added|round|bout|fight|non-|\()/i.test(trimmed)) return false;
+  if (/^(the|a|an|of|in|on|at|to|for|is|was|2|4|half|parts?|score|added|round|bout|fight|non-|\()$/i.test(trimmed)) return false;
   if (/blockspamming|last \d+ seconds|added from/i.test(trimmed)) return false;
   if (/^(tier|unranked|champion|vacant|n\/a|unknown|inactive|qualifier|non-tournament)$/i.test(trimmed)) return false;
   return true;

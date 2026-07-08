@@ -48,9 +48,10 @@ async function migrate() {
   }
 
   const admin = require('firebase-admin');
+  const { getFirestore } = require('firebase-admin/firestore');
   const serviceAccount = require(SA_FILE);
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  const db = admin.firestore();
+  admin.initializeApp({ credential: admin.cert(serviceAccount) });
+  const db = getFirestore();
 
   const raw = JSON.parse(fs.readFileSync(JSON_FILE, 'utf-8'));
   const data = raw.data || raw;
@@ -148,6 +149,32 @@ async function migrate() {
       }
     }
   }
+
+  // ── Fix multi-word opponent names ──
+  const knownNames = new Set(Object.keys(playerMap).map(k => k.toLowerCase()));
+  const scoreRe = /^(\d+-\d+)\s+(.+)$/;
+  const scoreOnlyRe = /^\d+-\d+$/;
+  let fixedOpponents = 0;
+  for (const m of matchList) {
+    const p2lower = m.player2.toLowerCase();
+    if (knownNames.has(p2lower)) continue;
+    const candidate = m.player2 + ' ' + m.score;
+    const canLower = candidate.toLowerCase();
+    if (knownNames.has(canLower)) {
+      m.player2 = candidate;
+      m.score = '';
+      if (scoreRe.test(m.event)) {
+        m.score = m.event.replace(scoreRe, '$1');
+        m.event = m.event.replace(scoreRe, '$2');
+      } else if (scoreOnlyRe.test(m.event)) {
+        m.score = m.event;
+        m.event = m.notes;
+        m.notes = '';
+      }
+      fixedOpponents++;
+    }
+  }
+  if (fixedOpponents) console.log(`Fixed ${fixedOpponents} multi-word opponent names`);
 
   // ── Deduplicate players ──
   const players = Object.values(playerMap);
