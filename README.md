@@ -1,5 +1,9 @@
 # 🏆 PL Dashboard — DW2 Pro League
 
+[![Vanilla JS](https://img.shields.io/badge/JS-Vanilla-F7DF1E?logo=javascript&logoColor=black)]()
+[![Host](https://img.shields.io/badge/Host-GitHub%20Pages-222222?logo=github&logoColor=white)]()
+[![License](https://img.shields.io/badge/license-MIT-green)]()
+
 Dashboard oficial da Pro League do Drunken Wrestlers 2. Records, rankings, estatísticas e painel administrativo.
 
 ## Arquitetura
