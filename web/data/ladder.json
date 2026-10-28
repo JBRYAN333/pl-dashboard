@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T17:15:28+00:00",
+  "generated_at": "2026-10-28T17:22:51+00:00",
   "guild": {
     "id": "1565031323880525985",
     "name": "Servidor de LostDreams",
@@ -149,10 +149,21 @@
   },
   "tournaments": [
     {
+      "id": "a28ca4edc9",
+      "name": "PL SUPR LADDER",
+      "mode": "PL",
+      "status": "registration",
+      "size": 4,
+      "entries": 2,
+      "champion_id": null,
+      "champion_name": null,
+      "created_at": "2026-10-28T17:17:45+00:00"
+    },
+    {
       "id": "7d427c19e0",
       "name": "Super Tournment",
       "mode": "PL",
-      "status": "registration",
+      "status": "cancelled",
       "size": 4,
       "entries": 1,
       "champion_id": null,
