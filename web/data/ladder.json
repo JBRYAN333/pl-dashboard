@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T17:45:51+00:00",
+  "generated_at": "2026-10-28T18:28:45+00:00",
   "guild": {
     "id": "1565031323880525985",
     "name": "Servidor de LostDreams",
@@ -152,7 +152,7 @@
       "id": "a28ca4edc9",
       "name": "PL SUPR LADDER",
       "mode": "PL",
-      "status": "registration",
+      "status": "cancelled",
       "size": 4,
       "entries": 1,
       "champion_id": null,
