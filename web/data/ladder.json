@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-28T21:30:37+00:00",
+  "generated_at": "2026-10-28T23:30:41+00:00",
   "guild": {
     "id": "1565031323880525985",
     "name": "Servidor de LostDreams",
@@ -10,7 +10,7 @@
       "label": "PL Ranked",
       "emoji": "🥊",
       "color": "#ff7a18",
-      "players": 2,
+      "players": 4,
       "matches": 1,
       "top_elo": 1216,
       "leaderboard": [
@@ -34,6 +34,38 @@
         },
         {
           "rank": 2,
+          "id": "297731272061485056",
+          "username": "shnookams",
+          "display_name": "Shnookams",
+          "avatar": "https://cdn.discordapp.com/avatars/297731272061485056/643906a31d13b3c7578cc9bfea65d3bc.png?size=128",
+          "elo": 1200,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 0,
+          "winrate": 0,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Prospect I",
+          "history": []
+        },
+        {
+          "rank": 3,
+          "id": "1438741576657539255",
+          "username": "preguica5678",
+          "display_name": "PREGUIÇA",
+          "avatar": "https://cdn.discordapp.com/avatars/1438741576657539255/d472c9fd0ca3b2d537a2bbd735c6519e.png?size=128",
+          "elo": 1200,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 0,
+          "winrate": 0,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Prospect I",
+          "history": []
+        },
+        {
+          "rank": 4,
           "id": "986439957411414027",
           "username": "bubllefetch123",
           "display_name": "LostDreams",
@@ -198,16 +230,71 @@
         ],
         "HCL": []
       }
+    },
+    "1438741576657539255": {
+      "id": "1438741576657539255",
+      "username": "preguica5678",
+      "display_name": "PREGUIÇA",
+      "avatar": "https://cdn.discordapp.com/avatars/1438741576657539255/d472c9fd0ca3b2d537a2bbd735c6519e.png?size=128",
+      "ratings": {
+        "PL": {
+          "elo": 1200,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 0,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Prospect I",
+          "history": []
+        }
+      },
+      "head_to_head": {
+        "PL": [],
+        "HCL": []
+      }
+    },
+    "297731272061485056": {
+      "id": "297731272061485056",
+      "username": "shnookams",
+      "display_name": "Shnookams",
+      "avatar": "https://cdn.discordapp.com/avatars/297731272061485056/643906a31d13b3c7578cc9bfea65d3bc.png?size=128",
+      "ratings": {
+        "PL": {
+          "elo": 1200,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 0,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Prospect I",
+          "history": []
+        }
+      },
+      "head_to_head": {
+        "PL": [],
+        "HCL": []
+      }
     }
   },
   "tournaments": [
+    {
+      "id": "47877ac19e",
+      "name": "test 2",
+      "mode": "PL",
+      "status": "running",
+      "size": 4,
+      "entries": 4,
+      "champion_id": null,
+      "champion_name": null,
+      "created_at": "2026-10-28T23:27:20+00:00"
+    },
     {
       "id": "40c80b661b",
       "name": "Test 1",
       "mode": "PL",
       "status": "registration",
       "size": 4,
-      "entries": 3,
+      "entries": 4,
       "champion_id": null,
       "champion_name": null,
       "created_at": "2026-10-28T21:22:17+00:00"
