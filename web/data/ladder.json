@@ -1,0 +1,273 @@
+{
+  "generated_at": "2026-10-28T17:15:28+00:00",
+  "guild": {
+    "id": "1565031323880525985",
+    "name": "Servidor de LostDreams",
+    "icon": null
+  },
+  "modes": {
+    "PL": {
+      "label": "PL Ranked",
+      "emoji": "🥊",
+      "color": "#ff7a18",
+      "players": 2,
+      "matches": 1,
+      "top_elo": 1216,
+      "leaderboard": [
+        {
+          "rank": 1,
+          "id": "1432824369276784710",
+          "username": "cheerful_unicorn_27702",
+          "display_name": "Nix",
+          "avatar": "https://cdn.discordapp.com/embed/avatars/3.png?size=128",
+          "elo": 1216,
+          "peak": 1216,
+          "wins": 1,
+          "losses": 0,
+          "winrate": 100,
+          "streak": 1,
+          "best_streak": 1,
+          "rank_name": "Prospect I",
+          "history": [
+            1216
+          ]
+        },
+        {
+          "rank": 2,
+          "id": "986439957411414027",
+          "username": "bubllefetch123",
+          "display_name": "LostDreams",
+          "avatar": "https://cdn.discordapp.com/avatars/986439957411414027/77925d40a2b649cd57b6a50c69cf55c5.png?size=128",
+          "elo": 1184,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 1,
+          "winrate": 0,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Journeyman III",
+          "history": [
+            1184
+          ]
+        }
+      ],
+      "recent_matches": [
+        {
+          "id": "001797239db0",
+          "lobby_code": "LuckyRift5593",
+          "mode": "PL",
+          "winner_id": "1432824369276784710",
+          "winner_name": "Nix",
+          "winner_avatar": "https://cdn.discordapp.com/embed/avatars/3.png?size=128",
+          "winner_delta": 16,
+          "loser_id": "986439957411414027",
+          "loser_name": "LostDreams",
+          "loser_avatar": "https://cdn.discordapp.com/avatars/986439957411414027/77925d40a2b649cd57b6a50c69cf55c5.png?size=128",
+          "loser_delta": -16,
+          "completed_at": "2026-10-28T16:06:53+00:00"
+        }
+      ]
+    },
+    "HCL": {
+      "label": "HCL Ranked",
+      "emoji": "🩸",
+      "color": "#ff3b4e",
+      "players": 0,
+      "matches": 0,
+      "top_elo": 1200,
+      "leaderboard": [],
+      "recent_matches": []
+    }
+  },
+  "players": {
+    "986439957411414027": {
+      "id": "986439957411414027",
+      "username": "bubllefetch123",
+      "display_name": "LostDreams",
+      "avatar": "https://cdn.discordapp.com/avatars/986439957411414027/77925d40a2b649cd57b6a50c69cf55c5.png?size=128",
+      "ratings": {
+        "PL": {
+          "elo": 1184,
+          "peak": 1200,
+          "wins": 0,
+          "losses": 1,
+          "streak": 0,
+          "best_streak": 0,
+          "rank_name": "Journeyman III",
+          "history": [
+            1184
+          ]
+        }
+      },
+      "head_to_head": {
+        "PL": [
+          {
+            "opponent": "1432824369276784710",
+            "opponent_name": "Nix",
+            "opponent_avatar": "https://cdn.discordapp.com/embed/avatars/3.png?size=128",
+            "wins": 0,
+            "losses": 1,
+            "games": 1
+          }
+        ],
+        "HCL": []
+      }
+    },
+    "1432824369276784710": {
+      "id": "1432824369276784710",
+      "username": "cheerful_unicorn_27702",
+      "display_name": "Nix",
+      "avatar": "https://cdn.discordapp.com/embed/avatars/3.png?size=128",
+      "ratings": {
+        "PL": {
+          "elo": 1216,
+          "peak": 1216,
+          "wins": 1,
+          "losses": 0,
+          "streak": 1,
+          "best_streak": 1,
+          "rank_name": "Prospect I",
+          "history": [
+            1216
+          ]
+        }
+      },
+      "head_to_head": {
+        "PL": [
+          {
+            "opponent": "986439957411414027",
+            "opponent_name": "LostDreams",
+            "opponent_avatar": "https://cdn.discordapp.com/avatars/986439957411414027/77925d40a2b649cd57b6a50c69cf55c5.png?size=128",
+            "wins": 1,
+            "losses": 0,
+            "games": 1
+          }
+        ],
+        "HCL": []
+      }
+    }
+  },
+  "tournaments": [
+    {
+      "id": "7d427c19e0",
+      "name": "Super Tournment",
+      "mode": "PL",
+      "status": "registration",
+      "size": 4,
+      "entries": 1,
+      "champion_id": null,
+      "champion_name": null,
+      "created_at": "2026-10-28T16:59:57+00:00"
+    }
+  ],
+  "ranks": {
+    "PL": [
+      {
+        "threshold": 1500,
+        "name": "Legend"
+      },
+      {
+        "threshold": 1466,
+        "name": "Contender III"
+      },
+      {
+        "threshold": 1433,
+        "name": "Contender II"
+      },
+      {
+        "threshold": 1400,
+        "name": "Contender I"
+      },
+      {
+        "threshold": 1366,
+        "name": "Challenger III"
+      },
+      {
+        "threshold": 1333,
+        "name": "Challenger II"
+      },
+      {
+        "threshold": 1300,
+        "name": "Challenger I"
+      },
+      {
+        "threshold": 1266,
+        "name": "Prospect III"
+      },
+      {
+        "threshold": 1233,
+        "name": "Prospect II"
+      },
+      {
+        "threshold": 1200,
+        "name": "Prospect I"
+      },
+      {
+        "threshold": 1166,
+        "name": "Journeyman III"
+      },
+      {
+        "threshold": 1133,
+        "name": "Journeyman II"
+      },
+      {
+        "threshold": 0,
+        "name": "Journeyman I"
+      }
+    ],
+    "HCL": [
+      {
+        "threshold": 1500,
+        "name": "Annihilator"
+      },
+      {
+        "threshold": 1466,
+        "name": "Bruiser III"
+      },
+      {
+        "threshold": 1433,
+        "name": "Bruiser II"
+      },
+      {
+        "threshold": 1400,
+        "name": "Bruiser I"
+      },
+      {
+        "threshold": 1366,
+        "name": "Brawler III"
+      },
+      {
+        "threshold": 1333,
+        "name": "Brawler II"
+      },
+      {
+        "threshold": 1300,
+        "name": "Brawler I"
+      },
+      {
+        "threshold": 1266,
+        "name": "Scrapper III"
+      },
+      {
+        "threshold": 1233,
+        "name": "Scrapper II"
+      },
+      {
+        "threshold": 1200,
+        "name": "Scrapper I"
+      },
+      {
+        "threshold": 1166,
+        "name": "Squabbler III"
+      },
+      {
+        "threshold": 1133,
+        "name": "Squabbler II"
+      },
+      {
+        "threshold": 0,
+        "name": "Squabbler I"
+      }
+    ]
+  }
+}
